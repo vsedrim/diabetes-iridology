@@ -24,14 +24,19 @@ diabetes-iridology-master/
 ├── src/                    # Módulos do projeto
 │   ├── __init__.py         # Inicialização do pacote
 │   ├── config.py           # Configurações centralizadas
-│   ├── segmentation.py     # Segmentação de íris/pupila (active contours)
+│   ├── segmentation.py     # Segmentação de íris/pupila + validação de pupila
 │   ├── normalization.py    # Normalização rubber sheet (Daugman)
-│   ├── preprocessing.py    # Transformações fotométricas
+│   ├── preprocessing.py    # Transformações fotométricas + realce de vascularização
 │   ├── feature_extraction.py # Extração de features
 │   ├── classifiers.py      # Classificadores ML
 │   ├── metrics.py          # Métricas de avaliação
 │   ├── local_analysis.py   # Análise por regiões
 │   └── results_generator.py # Geração de relatórios
+├── experiments/            # Demonstração e experimentos do PGC II
+│   ├── demo_vascularization_pupil.py
+│   └── report_experiments.py
+├── tests/                  # Testes unitários (unittest)
+│   └── test_vascularization_and_pupil.py
 ├── Data/
 │   └── Data/
 │       ├── all/            # Todos os dados
@@ -46,6 +51,7 @@ diabetes-iridology-master/
 │   └── pre processing/
 ├── img/                    # Imagens e figuras
 └── docs/                   # Relatório e pôster da IC1 (LaTeX e PDF)
+    └── PGC_2/              # Relatório parcial do PGC II (ABNT)
 ```
 
 ## 🚀 Instalação
@@ -198,6 +204,77 @@ python main.py --full-pipeline --raw-path ./raw_images
 - CLAHE (Contrast Limited Adaptive Histogram Equalization)
 - Gaussian Blur
 
+### Realce de Vascularização (algoritmos consolidados)
+
+Além de brilho/contraste e equalização, o módulo
+[`src/preprocessing.py`](src/preprocessing.py) traz a classe
+`VascularizationEnhancer` com três algoritmos estabelecidos em visão
+computacional e imagem médica para evidenciar estruturas tubulares/fibrosas
+do estroma da íris (vasos, fibras radiais, criptas):
+
+- **Frangi**: realce de vascularização por *vesselness* hessiano multiescala
+  (Frangi et al., MICCAI 1998). A resposta vem dos autovalores da matriz
+  hessiana e é seletiva para estruturas tubulares.
+- **Gabor**: resposta máxima de um banco de filtros de Gabor orientados;
+  realça fibras e vasos direcionais (base do reconhecimento de íris de Daugman).
+- **Black-hat**: top-hat/black-hat morfológico multiescala; extrai estruturas
+  finas claras ou escuras independentemente da iluminação de fundo.
+- **Vessel**: combinação ponderada padrão dos mapas (0.6 Frangi + 0.4 black-hat).
+
+Pré-processamento comum: canal verde (padrão na literatura de retina) e CLAHE.
+Os realces estão integrados ao `PhotometricTransform`, então entram no pipeline
+e nos testes de robustez como qualquer outra transformação.
+
+**Resultados (anel da íris das duas fotografias públicas).** A visibilidade da
+vascularização é medida pela razão contraste-ruído (*structure_contrast*, CNR)
+e pela energia de cristas (*ridge_energy*). Os valores abaixo são as razões em
+relação à melhor linha de base (brilho, contraste ou CLAHE) na Tabela 1 do
+relatório do PGC II:
+
+| Método | CNR (vs melhor baseline) | Energia de cristas (vs baseline) |
+|--------|--------------------------|----------------------------------|
+| Melhor linha de base | 1.0x | 1.0x |
+| **Frangi** | **2.02-2.36x** | **5.25-5.33x** |
+| Gabor | 1.19-1.69x | 0.28-1.33x |
+| Black-hat | 0.98-1.25x | 0.14-0.48x |
+
+O Frangi separa as fibras do fundo cerca de duas vezes melhor que brilho e
+contraste e superou a linha de base nos 24 setores angulares avaliados. O banco
+de Gabor ganha menos nas fotografias, mas foi o mais estável sob ruído no
+fantoma sintético. A avaliação completa está em [`docs/PGC_2/`](docs/PGC_2/).
+
+### Validação de Pupila
+
+O módulo [`src/segmentation.py`](src/segmentation.py) traz `PupilValidator`,
+que classifica a geometria pupila-íris a partir de descritores interpretáveis:
+diâmetro da pupila, diâmetro da íris, espessura do anel da íris
+(`r_iris - r_pupila`), razão pupila/íris e excentricidade (concentricidade dos
+centros). A classificação é baseada em faixas fisiológicas (razão pupila/íris
+~0.2-0.7) e devolve rótulo (`valid`/`borderline`/`invalid`), pontuação de
+qualidade e motivos. Também expõe um vetor de *features* pronto para um
+classificador supervisionado.
+
+### Demonstração e experimentos reprodutíveis
+
+[`experiments/demo_vascularization_pupil.py`](experiments/demo_vascularization_pupil.py)
+roda os realces e a validação de pupila sobre as imagens reais de íris em
+[`docs/imagens/`](docs/imagens/), mede CNR, energia de cristas e entropia
+**dentro do anel da íris** e grava em `results/` os painéis comparativos, a
+imagem anotada da validação e as tabelas (CSV/Markdown).
+[`experiments/report_experiments.py`](experiments/report_experiments.py) roda
+os onze experimentos do relatório do PGC II (E0 a E10), regenera as figuras,
+as tabelas e as séries de [`docs/PGC_2/`](docs/PGC_2/) e grava os CSVs
+completos e um `resumo.json` em `results/report/`. Os números e figuras são
+medidos na execução, não fixados no código. Os testes em [`tests/`](tests/)
+cobrem forma/intervalo das saídas, a vantagem do Frangi sobre o baseline e as
+fronteiras do classificador.
+
+```bash
+python experiments/demo_vascularization_pupil.py
+python experiments/report_experiments.py   # cerca de 3 minutos
+python -m unittest discover -s tests
+```
+
 ## 📈 Resultados Esperados
 
 Conforme metodologia do artigo, o dataset `personBase` tende a apresentar os melhores resultados por reduzir vazamento de identidade:
@@ -225,7 +302,29 @@ duplicadas entre as 196 da base legada, e a avaliação antiga não demonstrava 
 Por isso os valores próximos de 92% precisam ser recalculados.
 
 O trabalho continua em dois repositórios: o PGC em [`vsedrim/Iris`](https://github.com/vsedrim/Iris)
-e a IC2 em [`vsedrim/Iris-IC2`](https://github.com/vsedrim/Iris-IC2).
+e a IC2 em [`vsedrim/Iris-IC2`](https://github.com/vsedrim/Iris-IC2). A etapa do PGC II sobre
+vascularização e pupila foi desenvolvida sobre o pipeline deste repositório e está descrita na
+seção seguinte.
+
+## Relatório parcial do PGC II
+
+A pasta [`docs/PGC_2/`](docs/PGC_2/) tem o relatório parcial do PGC II, sobre o realce da
+vascularização da íris e a validação geométrica da pupila, no formato da ABNT (classe `abntex2`):
+
+- [`metodologia_vascularizacao_pupila.tex`](docs/PGC_2/metodologia_vascularizacao_pupila.tex) e o
+  [PDF](docs/PGC_2/metodologia_vascularizacao_pupila.pdf).
+- `figuras/`, `tabelas/` e `dados/`: gerados por
+  [`experiments/report_experiments.py`](experiments/report_experiments.py). Para mudar um número,
+  reexecute o script em vez de editar as tabelas.
+
+Para compilar, rode `pdflatex metodologia_vascularizacao_pupila.tex` duas vezes dentro de
+`docs/PGC_2/`. Os Apêndices A e B trazem o ambiente, as sementes e a configuração completa dos
+experimentos. Os tempos de execução (E7) dependem da máquina, então depois de uma nova execução do
+script a tabela de tempos pode não bater com os valores citados no texto.
+
+Os experimentos usam as duas fotografias públicas de [`docs/imagens/`](docs/imagens/), porque o
+conjunto rotulado para DM2 não estava disponível nesta etapa. Os resultados verificam o
+funcionamento dos métodos e não sustentam conclusões clínicas.
 
 ## 📁 Dataset
 

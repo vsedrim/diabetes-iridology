@@ -16,6 +16,12 @@ results/
 *.out
 *.synctex.gz
 *.toc
+*.lof
+*.lot
+*.loq
+*.loa
+*.bbl
+*.blg
 
 # Material de terceiros e configuração local
 docs/referencias_visuais/

@@ -1,0 +1,15 @@
+% Gerado por experiments/report_experiments.py (não editar à mão).
+\begin{tabular}{lccc}
+\toprule
+Método & AUC (média $\pm$ dp) & CNR com verdade & CNR por Otsu \\
+\midrule
+Original (verde) & 0,685 $\pm$ 0,029 & 0,65 & 2,78 \\
+Brilho $+40$ & 0,685 $\pm$ 0,029 & 0,65 & 2,78 \\
+Contraste $\times1{,}8$ & 0,684 $\pm$ 0,028 & 0,64 & 2,77 \\
+CLAHE & 0,751 $\pm$ 0,020 & 0,95 & 2,87 \\
+\midrule
+Frangi & 0,757 $\pm$ 0,011 & 1,06 & 5,44 \\
+Gabor & \textbf{0,879} $\pm$ \textbf{0,013} & 2,44 & 4,68 \\
+\textit{Black-hat} & 0,628 $\pm$ 0,017 & 0,48 & 2,58 \\
+\bottomrule
+\end{tabular}
