@@ -1,0 +1,22 @@
+% Gerado por experiments/report_experiments.py (não editar à mão).
+\begin{tabular}{llccccc}
+\toprule
+Conjunto & Algoritmo & $n$ & Mediana CNR & Razão mediana (IC 95\%) & Vitórias & $p$ (Wilcoxon) \\
+\midrule
+\multirow{3}{*}{Olho completo} & Frangi & 12 & 6,16 & 1,85 (1,55--2,68) & 12/12 & $<0{,}001$ \\
+ & Gabor & 11 & 3,65 & 1,21 (0,98--1,60) & 8/11 & 0,021 \\
+ & \textit{Black-hat} & 12 & 2,96 & 0,96 (0,75--1,86) & 5/12 & 0,339 \\
+\midrule
+\multirow{3}{*}{Macro da íris} & Frangi & 12 & 6,83 & 2,01 (1,61--2,21) & 12/12 & $<0{,}001$ \\
+ & Gabor & 12 & 4,11 & 1,14 (1,01--1,34) & 9/12 & 0,005 \\
+ & \textit{Black-hat} & 12 & 3,65 & 0,99 (0,78--1,17) & 4/12 & 0,849 \\
+\midrule
+\multirow{3}{*}{Ambas} & Frangi & 24 & 6,69 & 1,92 (1,64--2,23) & 24/24 & $<0{,}001$ \\
+ & Gabor & 23 & 4,10 & 1,17 (1,03--1,34) & 17/23 & $<0{,}001$ \\
+ & \textit{Black-hat} & 24 & 3,47 & 0,98 (0,78--1,18) & 9/24 & 0,668 \\
+\midrule
+\multirow{3}{*}{\makecell[l]{Olho completo\\(sem S1--S2)}} & Frangi & 10 & 5,72 & 1,78 (1,45--2,81) & 10/10 & $<0{,}001$ \\
+ & Gabor & 9 & 3,61 & 1,10 (0,86--1,60) & 6/9 & 0,082 \\
+ & \textit{Black-hat} & 10 & 2,79 & 0,85 (0,73--1,38) & 3/10 & 0,722 \\
+\bottomrule
+\end{tabular}
