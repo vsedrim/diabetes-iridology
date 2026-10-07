@@ -1,0 +1,336 @@
+% !TeX program = pdflatex
+\documentclass[12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[brazilian]{babel}
+\usepackage{lmodern}
+\usepackage{tgheros}
+\usepackage{geometry}
+\geometry{paperwidth=900mm,paperheight=1200mm,margin=0mm}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,calc}
+\usepackage{amsmath}
+\usepackage{microtype}
+\usepackage[hidelinks,unicode]{hyperref}
+
+\hypersetup{
+  pdftitle={Iridologia sob Lentes Científicas: Avaliação Crítica com Aprendizado de Máquina},
+  pdfauthor={Vinicius Sedrim; Vladimir Emiliano Moreira Rocha},
+  pdfsubject={Iniciação Científica UFABC: avaliação crítica de imagens de íris para DM2},
+  pdfkeywords={UFABC, CMCC, CNPq, iridologia, diabetes tipo 2, aprendizado de máquina},
+  pdfdisplaydoctitle=true,
+  pdfprintscaling=None
+}
+
+\renewcommand{\familydefault}{\sfdefault}
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0pt}
+\setlength{\emergencystretch}{1em}
+\hyphenpenalty=9000
+\tolerance=1400
+
+\definecolor{Ink}{HTML}{20352E}
+\definecolor{Forest}{HTML}{075B45}
+\definecolor{DeepForest}{HTML}{123F32}
+\definecolor{Teal}{HTML}{288B78}
+\definecolor{Mist}{HTML}{EDF4F0}
+\definecolor{Rule}{HTML}{CDDCD4}
+\definecolor{Muted}{HTML}{51685E}
+\definecolor{Gold}{HTML}{D6AF54}
+\definecolor{Blue}{HTML}{597F96}
+\definecolor{Brick}{HTML}{AA6450}
+\definecolor{Pupil}{HTML}{08291F}
+
+\newcommand{\Font}[1]{\fontsize{#1}{\dimexpr #1pt*6/5\relax}\selectfont}
+\newcommand{\PosterCite}[1]{\textcolor{Forest}{\hyperlink{ref:#1}{[#1]}}}
+\newsavebox{\PosterBlock}
+\newsavebox{\PosterCapital}
+
+\newcommand{\Block}[6]{%
+  \node[anchor=north west,inner sep=0pt,outer sep=0pt,
+    text=Ink,font=\normalfont\sffamily\Font{#5}] at (#1,{#2}) {%
+    \sbox{\PosterBlock}{%
+      \begin{minipage}[t]{#3cm}
+        \raggedright #6\par
+      \end{minipage}%
+    }%
+    \typeout{POSTER-BLOCK (#1,#2) height=\the\dimexpr\ht\PosterBlock+\dp\PosterBlock\relax; limit=#4cm}%
+    \ifdim\dimexpr\ht\PosterBlock+\dp\PosterBlock\relax>#4cm
+      \PackageError{poster}{Block at (#1,#2) exceeds #4 cm}{Shorten the text or increase its reserved height.}%
+    \fi
+    \usebox{\PosterBlock}%
+  };%
+}
+
+\newcommand{\SectionLabel}[4]{%
+  \Block{#1}{#2}{#3}{2.0}{36}{\color{Forest}\bfseries #4}%
+  \draw[Rule,line width=1pt] (#1,{#2+2.1}) -- ({#1+#3},{#2+2.1});%
+}
+
+\newcommand{\MethodStep}[5]{%
+  \node[circle,fill=Forest,text=white,minimum size=1.2cm,inner sep=0pt,
+    font=\Font{24}\bfseries] at (3.65,{#1+0.6}) {#2};%
+  \Block{5.4}{#1}{25.1}{1.6}{30}{\bfseries #3}%
+  \Block{5.4}{#1+1.7}{25.1}{#4}{28}{#5}%
+}
+
+\newcommand{\CheckCapHeight}[2]{%
+  \sbox{\PosterCapital}{{\Font{#2}\bfseries H}}%
+  \typeout{POSTER-CHECK #1 capital-height=\the\ht\PosterCapital}%
+  \ifdim\ht\PosterCapital<15mm
+    \PackageError{poster}{#1 capital height is below 15 mm}{Increase the font size; do not scale the final PDF.}%
+  \fi
+}
+
+\begin{document}
+\CheckCapHeight{Title}{80}
+\CheckCapHeight{Unit}{64}
+\typeout{POSTER-CHECK paper-width=\the\paperwidth; paper-height=\the\paperheight}
+\null
+\begin{tikzpicture}[remember picture,overlay]
+\begin{scope}[shift={(current page.north west)},x=1cm,y=-1cm]
+
+\fill[white] (0,0) rectangle (90,120);
+\fill[Forest] (0,0) rectangle (90,0.65);
+\fill[Gold] (73,0) rectangle (90,0.65);
+
+\Block{3}{2.4}{18}{4.8}{102}{\color{Forest}\bfseries UFABC}
+\Block{23}{2.65}{64}{2.5}{64}{\color{Forest}\bfseries UNIVERSIDADE FEDERAL DO ABC}
+\Block{23}{5.65}{64}{3.0}{64}{\color{Forest}\bfseries CENTRO DE MATEMÁTICA, COMPUTAÇÃO E COGNIÇÃO}
+\Block{3}{9.0}{43}{1.1}{23}{\color{Muted}\bfseries ENCONTRO DE INICIAÇÃO CIENTÍFICA / 2026}
+\Block{58}{9.0}{29}{1.1}{23}{\color{Muted}CIÊNCIA DA COMPUTAÇÃO / CNPq}
+
+\fill[DeepForest] (0,11.5) rectangle (90,30.5);
+\fill[Gold] (0,30.5) rectangle (90,30.7);
+\Block{3}{13.4}{64.5}{10.0}{80}{\color{white}\bfseries
+  IRIDOLOGIA SOB LENTES CIENTÍFICAS:\\[0.12cm]
+  AVALIAÇÃO CRÍTICA COM\\[0.12cm]
+  APRENDIZADO DE MÁQUINA
+}
+\Block{3}{24.5}{65}{2.1}{35}{\color{white}\bfseries
+  Vinicius Sedrim\enspace\textperiodcentered\enspace Vladimir Emiliano Moreira Rocha
+}
+\Block{3}{27.1}{65}{1.5}{27}{\color{white!85!DeepForest}
+  Bolsista CNPq: Vinicius Sedrim\quad /\quad Orientador: Vladimir E. M. Rocha
+}
+
+\begin{scope}[shift={(77,20.4)}]
+  \fill[Forest] (0,0) circle (7.6);
+  \draw[white!30!DeepForest,line width=1.2pt] (0,0) circle (7.9);
+  \draw[Gold,line width=2.2pt] (0,0) circle (7.6);
+  \foreach \angle in {0,4,...,356} {
+    \pgfmathsetmacro{\innerRadius}{2.45+0.23*sin(7*\angle)}
+    \pgfmathsetmacro{\outerRadius}{7.25+0.18*sin(11*\angle)}
+    \draw[white!47!Teal,line width=0.9pt]
+      (\angle:\innerRadius) .. controls ({\angle+4}:4.3)
+      and ({\angle-3}:5.8) .. (\angle:\outerRadius);
+    \draw[Gold!70!Forest,line width=1.15pt]
+      ({\angle+1}:\innerRadius) .. controls ({\angle-3}:3.4)
+      and ({\angle+5}:4.1) .. ({\angle+2}:4.65);
+  }
+  \draw[white!40!Teal,line width=1pt] (0,0) circle (5.55);
+  \fill[Pupil] (0,0) circle (2.3);
+  \draw[Gold!85!white,line width=1.4pt] (0,0) circle (2.45);
+  \foreach \angle in {0,30,...,330} {
+    \draw[white!55!DeepForest,line width=1.1pt] (\angle:8.1) -- (\angle:8.45);
+  }
+\end{scope}
+\Block{68.5}{29.0}{17}{1}{19}{\centering\color{white!80!DeepForest}Íris: representação esquemática própria}
+
+\Block{3}{33.0}{84}{1.3}{25}{\color{Forest}\bfseries A PERGUNTA DE PESQUISA}
+\Block{3}{35.1}{84}{2.6}{48}{\bfseries
+  O que a íris permite inferir sobre o diabetes tipo 2?
+}
+\Block{3}{38.2}{84}{3.1}{31}{
+  Investigamos se imagens da íris distinguem indivíduos com diabetes mellitus tipo 2 (DM2)
+  e controles, com separação por pessoa e testes de robustez.
+  \textbf{Um sinal estatístico não equivale a um diagnóstico clínico.}
+}
+
+\draw[Rule,line width=1.2pt] (32.6,44) -- (32.6,99.8);
+
+\SectionLabel{3}{44}{27.5}{01 / INTRODUÇÃO}
+\Block{3}{47.0}{27.5}{9.5}{30}{
+  A iridologia associa regiões da íris a órgãos, mas estudos controlados não sustentam
+  sua confiabilidade diagnóstica.\,\PosterCite{1}\par\vspace{0.55cm}
+  Resultados de aprendizado de máquina para DM2 reabrem a pergunta, sem eliminar
+  riscos de viés de aquisição e vazamento de dados.\,\PosterCite{2}\PosterCite{3}
+}
+
+\SectionLabel{3}{58.0}{27.5}{02 / OBJETIVOS}
+\Block{3}{61.0}{27.5}{7.0}{30}{
+  Avaliar criticamente o sinal nas imagens, comparar classificadores e verificar sua
+  sensibilidade ao pré-processamento.\par\vspace{0.55cm}
+  Investigar regiões locais como \textbf{hipóteses exploratórias}, sem presumir
+  validade dos mapas iridológicos.
+}
+
+\SectionLabel{3}{69.1}{27.5}{03 / MATERIAIS E MÉTODOS}
+\MethodStep{72.2}{1}{Preparar as imagens}{3.8}{
+  Imagens de íris rotuladas como DM2 ou controle; segmentação de íris e pupila.
+}
+\MethodStep{78.7}{2}{Normalizar e representar}{3.8}{
+  Mapeamento polar \textit{rubber sheet}; intensidades dos pixels como representação-base.
+}
+\MethodStep{85.2}{3}{Treinar e avaliar}{4.2}{
+  LR, SVM, RF, MLP e AdaBoost; validação estratificada em 5 \textit{folds},
+  agrupada por pessoa; semente 42.
+}
+\fill[Mist] (3,92.7) rectangle (30.5,99.8);
+\fill[Forest] (3,92.7) rectangle (3.22,99.8);
+\Block{4.2}{93.5}{25.0}{1.2}{24}{\color{Forest}\bfseries CONTROLE CONTRA VAZAMENTO}
+\Block{4.2}{95.25}{25.0}{3.6}{28}{
+  Nenhuma pessoa em treino e teste na mesma partição. Padronização estimada
+  somente com dados de treino.
+}
+
+\SectionLabel{35}{44}{52}{04 / RESULTADOS E DISCUSSÃO}
+\Block{35}{47.0}{23.5}{4.9}{105}{\color{Forest}\bfseries 92,36\%}
+\Block{35}{52.0}{24.5}{3.0}{28}{
+  \textbf{Acurácia do MLP}\par
+  DP de 3,59 pontos percentuais
+}
+\Block{62}{47.6}{12}{2.6}{51}{\color{Forest}\bfseries 92,60\%}
+\Block{62}{50.7}{12}{1.2}{25}{Sensibilidade}
+\Block{76}{47.6}{11}{2.6}{51}{\color{Forest}\bfseries 92,10\%}
+\Block{76}{50.7}{11}{1.2}{25}{Especificidade}
+\Block{62}{53.0}{25}{1.6}{27}{Precisão: 92,80\%\quad F1: 92,70\%}
+
+\Block{35}{57.0}{52}{1.6}{30}{\bfseries Comparação global / quatro melhores classificadores}
+\Block{35}{59.0}{52}{1.2}{24}{\color{Muted}
+  Mesma representação (pixels) e particionamento por pessoa.
+}
+
+\foreach \tick in {80,85,90,95,100} {
+  \pgfmathsetmacro{\tickX}{43.8+(\tick-80)*1.72}
+  \draw[Rule,line width=0.7pt] (\tickX,61.25) -- (\tickX,70.0);
+  \node[anchor=north,font=\Font{23},text=Muted,inner sep=0pt]
+    at (\tickX,70.5) {\tick};
+}
+\foreach \model/\mean/\deviation/\rowY/\modelColor/\valueLabel in {
+  MLP/92.36/3.59/62.0/Forest/{92,36},
+  LR/90.81/3.50/64.3/Blue/{90,81},
+  SVM/88.24/6.22/66.6/Blue/{88,24},
+  AdaBoost/87.79/5.07/68.9/Blue/{87,79}} {
+  \pgfmathsetmacro{\meanX}{43.8+(\mean-80)*1.72}
+  \pgfmathsetmacro{\lowX}{43.8+(\mean-\deviation-80)*1.72}
+  \pgfmathsetmacro{\highX}{43.8+(\mean+\deviation-80)*1.72}
+  \node[anchor=west,font=\Font{29}\bfseries,text=Ink,inner sep=0pt]
+    at (35,\rowY) {\model};
+  \draw[\modelColor,line width=2.6pt] (\lowX,\rowY) -- (\highX,\rowY);
+  \draw[\modelColor,line width=2pt] (\lowX,{\rowY-0.28}) -- (\lowX,{\rowY+0.28});
+  \draw[\modelColor,line width=2pt] (\highX,{\rowY-0.28}) -- (\highX,{\rowY+0.28});
+  \fill[\modelColor] (\meanX,\rowY) circle (0.19);
+  \node[anchor=east,font=\Font{29}\bfseries,text=\modelColor,inner sep=0pt]
+    at (87,\rowY) {\valueLabel\%};
+}
+\Block{35}{72.4}{52}{1.7}{23}{\color{Muted}
+  Acurácia (\%). Pontos: médias; barras: $\pm$1 DP entre 5 \textit{folds}, não intervalos
+  de confiança. A comparação não estabelece superioridade estatística.
+}
+
+\draw[Rule,line width=0.8pt] (35,75.3) -- (87,75.3);
+\Block{35}{76.4}{25}{1.7}{31}{\bfseries Robustez fotométrica}
+\Block{35}{78.6}{25}{1.2}{24}{\color{Muted}MLP / separação por pessoa}
+\foreach \transform/\value/\rowY in {
+  Original/{92,36\%}/81.4,
+  Equalização global/{92,33\%}/83.5,
+  CLAHE/{92,18\%}/85.6,
+  Desfoque gaussiano/{91,74\%}/87.7,
+  Composição\textsuperscript{*}/{91,96\%}/89.8} {
+  \node[anchor=west,inner sep=0pt,font=\Font{25},text=Ink]
+    at (35,\rowY) {\transform};
+  \node[anchor=east,inner sep=0pt,font=\Font{28}\bfseries,text=Forest]
+    at (59.0,\rowY) {\value};
+  \draw[Rule,line width=0.6pt] (35,{\rowY+0.95}) -- (59,{\rowY+0.95});
+}
+\Block{35}{92.0}{24}{1.8}{20}{\color{Muted}
+  \textsuperscript{*}Equalização global + CLAHE + desfoque.
+  CLAHE: equalização adaptativa com limite de contraste.
+}
+\Block{35}{94.4}{10.8}{3.0}{56}{\color{Brick}\bfseries 0,62 pp}
+\Block{46.7}{94.5}{12.7}{4.9}{26}{
+  Maior queda de acurácia em relação à configuração original.
+}
+
+\Block{62.5}{76.4}{24.5}{1.7}{31}{\bfseries Análise local / exploratória}
+\Block{62.5}{78.6}{24.5}{1.2}{23}{\color{Muted}LR + equalização / por pessoa}
+
+\foreach \row [count=\rowIndex from 0] in {
+  {61,62,60,58,59,61,63,60,58,59,60,61},
+  {62,65,68,64,62,65,67,62,60,61,62,63},
+  {60,68,88,91,89,70,65,61,59,60,61,60},
+  {59,66,92,95,90,72,64,60,58,59,60,62},
+  {61,64,87,89,86,69,63,62,60,61,63,61},
+  {63,62,65,67,64,62,61,64,62,63,61,60},
+  {60,61,63,65,62,60,59,61,63,60,59,58},
+  {58,60,61,62,60,59,58,60,61,62,60,59},
+  {59,59,60,61,59,58,57,59,60,61,59,58},
+  {60,61,62,60,58,59,60,62,63,60,58,59},
+  {61,62,61,59,60,61,62,61,62,61,60,60},
+  {58,60,59,58,59,60,61,59,58,59,60,61}} {
+  \foreach \accuracy [count=\columnIndex from 0] in \row {
+    \pgfmathsetmacro{\cellShade}{100*(\accuracy-55)/40}
+    \pgfmathsetmacro{\cellX}{64.6+1.1*\columnIndex}
+    \pgfmathsetmacro{\cellY}{81.6+1.1*\rowIndex}
+    \fill[Forest!\cellShade!Mist]
+      (\cellX,\cellY) rectangle ({\cellX+1.07},{\cellY+1.07});
+  }
+}
+\draw[Gold,line width=2.3pt] (66.8,83.8) rectangle (70.1,87.1);
+\node[font=\Font{20}\bfseries,text=white,inner sep=0pt] at (68.435,85.435) {95};
+\foreach \index in {0,3,6,9,11} {
+  \node[anchor=south,inner sep=0pt,font=\Font{20},text=Muted]
+    at ({65.15+1.1*\index},81.25) {\index};
+  \node[anchor=east,inner sep=0pt,font=\Font{20},text=Muted]
+    at (64.2,{82.15+1.1*\index}) {\index};
+}
+\Block{79.2}{83.0}{7.8}{2.8}{49}{\color{Forest}\bfseries 95\%}
+\Block{79.2}{86.2}{7.8}{5.4}{23}{Pico local na célula (3,3) de uma grade $12\times12$.}
+\foreach \index in {0,...,79} {
+  \pgfmathsetmacro{\shade}{100*\index/79}
+  \fill[Forest!\shade!Mist] ({64.6+0.165*\index},95.45)
+    rectangle ({64.6+0.165*(\index+1)},95.9);
+}
+\node[anchor=north west,font=\Font{20},inner sep=0pt,text=Muted] at (64.6,96.2) {55\%};
+\node[anchor=north,font=\Font{20},inner sep=0pt,text=Muted] at (71.2,96.2) {Acurácia};
+\node[anchor=north east,font=\Font{20},inner sep=0pt,text=Muted] at (77.8,96.2) {95\%};
+\Block{62.5}{97.6}{24.5}{3.2}{24}{
+  ROI associada ao pâncreas pelo mapa iridológico. Seleção entre 144 células;
+  exige controle de múltiplas comparações.
+}
+
+\fill[Mist] (0,102.4) rectangle (90,111.6);
+\fill[Forest] (3,104.0) rectangle (3.24,110.0);
+\Block{4.3}{103.9}{22}{1.7}{31}{\color{Forest}\bfseries 05 / CONCLUSÕES}
+\Block{4.3}{106.3}{22}{3.9}{36}{\color{Forest}\bfseries
+  Classificar não é validar clinicamente.
+}
+\Block{29.0}{104.0}{57.0}{6.3}{30}{
+  Há separabilidade entre os grupos no conjunto avaliado, mantida sob as transformações
+  fotométricas testadas. \textbf{Isso não comprova a iridologia nem autoriza uso diagnóstico.}\par\vspace{0.55cm}
+  Próximos passos: validação em base independente, reavaliação com múltiplas sementes,
+  auditoria de vieses de aquisição e confirmação das regiões locais.
+}
+
+\Block{3}{112.8}{24.5}{1.3}{26}{\color{Forest}\bfseries AGRADECIMENTOS}
+\Block{3}{114.4}{24.5}{3.6}{23}{
+  Este trabalho foi financiado pelo CNPq no âmbito da Iniciação Científica da UFABC.
+  Agradeço à UFABC e ao orientador pelo apoio.
+}
+
+\Block{29}{112.8}{58}{1.3}{26}{\color{Forest}\bfseries REFERÊNCIAS PRINCIPAIS}
+\Block{29}{114.4}{58}{4.5}{20}{
+  \hypertarget{ref:1}{\textbf{[1]}} ERNST, E. Iridology: a systematic review.
+  \textit{Archives of Ophthalmology}, 118(1):120--121, 2000.\par\vspace{0.15cm}
+  \hypertarget{ref:2}{\textbf{[2]}} SAMANT, P.; AGARWAL, R. Machine learning techniques for medical diagnosis
+  of diabetes using iris images. \textit{Comput. Methods Programs Biomed.}, 157:121--128, 2018.\par\vspace{0.15cm}
+  \hypertarget{ref:3}{\textbf{[3]}} ZECH, J. R. et al. Variable generalization performance of a deep learning model
+  to detect pneumonia in chest radiographs: A cross-sectional study. \textit{PLOS Medicine}, 15(11):e1002683, 2018.
+}
+\fill[Forest] (0,119.6) rectangle (90,120);
+
+\end{scope}
+\end{tikzpicture}
+\end{document}

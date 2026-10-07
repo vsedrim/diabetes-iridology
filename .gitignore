@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Dados e resultados locais (a base não deve ser redistribuída)
+Data/
+results/
+
+# Artefatos do LaTeX
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+*.toc
+
+# Material de terceiros e configuração local
+docs/referencias_visuais/
+.vscode/
