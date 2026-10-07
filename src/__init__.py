@@ -16,13 +16,17 @@ from .config import (
     ColorChannel,
     SegmentationConfig,
     NormalizationConfig,
+    PupilValidationConfig,
     get_default_config
 )
 
 from .segmentation import (
     IrisSegmenter,
     SegmentationResult,
-    create_segmenter
+    PupilValidator,
+    PupilValidationResult,
+    create_segmenter,
+    create_pupil_validator
 )
 
 from .normalization import (
@@ -35,7 +39,9 @@ from .normalization import (
 
 from .preprocessing import (
     ImagePreprocessor,
-    create_preprocessor
+    VascularizationEnhancer,
+    create_preprocessor,
+    create_vascularization_enhancer
 )
 
 from .feature_extraction import (

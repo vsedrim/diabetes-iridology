@@ -14,10 +14,222 @@ Referência:
 
 import cv2
 import numpy as np
-from typing import Tuple, Optional, Union
+from typing import Tuple, Optional, Union, Dict
 from enum import Enum
 
+from skimage.filters import frangi
+from skimage.util import img_as_float
+from skimage.measure import shannon_entropy
+
 from .config import PreprocessingConfig, PhotometricTransform, ColorChannel
+
+
+class VascularizationEnhancer:
+    """
+    Realce de vascularização e estroma da íris por algoritmos consolidados.
+
+    Motivação: ir além de brilho/contraste simples e
+    equalização, usando métodos já estabelecidos em visão computacional e
+    imagem médica para evidenciar estruturas tubulares/fibrosas (vasos,
+    fibras radiais, criptas):
+
+    1. Frangi vesselness (realce Hessiano multiescala)
+       Frangi et al., "Multiscale vessel enhancement filtering", MICCAI 1998.
+       Resposta construída a partir dos autovalores da matriz Hessiana em
+       várias escalas; alta para estruturas tubulares, baixa para blobs/planos.
+
+    2. Banco de filtros de Gabor orientados
+       Resposta máxima entre orientações realça fibras/vasos direcionais;
+       base do reconhecimento de íris de Daugman e de realce de textura.
+
+    3. Top-hat / black-hat morfológico multiescala
+       Soares et al. e literatura de retina: extrai estruturas finas, claras
+       (top-hat) ou escuras (black-hat), em múltiplas escalas de elemento
+       estruturante, independente de iluminação de fundo.
+
+    Pré-processamento comum: canal verde (maior contraste de vasos em imagens
+    RGB) e CLAHE, prática padrão em realce de fundo de olho/íris.
+    """
+
+    def __init__(self, config: Optional[PreprocessingConfig] = None):
+        self.config = config or PreprocessingConfig()
+        self._clahe = cv2.createCLAHE(
+            clipLimit=self.config.clahe_clip_limit,
+            tileGridSize=self.config.clahe_tile_grid_size
+        )
+        self._gabor_kernels = self._build_gabor_bank()
+
+    # ----------------------------- utilitários -----------------------------
+    @staticmethod
+    def _to_uint8(image: np.ndarray) -> np.ndarray:
+        """Normaliza min-max para [0, 255] uint8 de forma segura."""
+        img = image.astype(np.float64)
+        mn, mx = float(img.min()), float(img.max())
+        if mx - mn < 1e-12:
+            return np.zeros(img.shape, dtype=np.uint8)
+        norm = (img - mn) / (mx - mn)
+        return (norm * 255.0).astype(np.uint8)
+
+    @staticmethod
+    def _stretch_display(response: np.ndarray,
+                         p_low: float = 2.0, p_high: float = 99.0,
+                         gamma: float = 0.7) -> np.ndarray:
+        """
+        Normalização de exibição por percentil + gama para respostas de filtro.
+
+        A resposta do Frangi é esparsa e concentrada em valores baixos; o
+        recorte por percentil e a correção de gama tornam visíveis as cristas
+        reais sem alterar o que foi detectado (prática padrão de visualização).
+        """
+        r = response.astype(np.float64)
+        lo = float(np.percentile(r, p_low))
+        hi = float(np.percentile(r, p_high))
+        if hi - lo < 1e-12:
+            return VascularizationEnhancer._to_uint8(r)
+        r = np.clip((r - lo) / (hi - lo), 0.0, 1.0)
+        if gamma and gamma != 1.0:
+            r = np.power(r, gamma)
+        return (r * 255.0).astype(np.uint8)
+
+    def _prep(self, image: np.ndarray, equalize: bool = True) -> np.ndarray:
+        """Usa o canal verde (padrão na literatura de retina) e aplica CLAHE."""
+        if image.ndim == 3:
+            gray = image[:, :, 1]  # canal verde no BGR do OpenCV
+        else:
+            gray = image
+        gray = gray.astype(np.uint8)
+        if equalize:
+            gray = self._clahe.apply(gray)
+        return gray
+
+    def _build_gabor_bank(self) -> list:
+        kernels = []
+        n = max(1, int(self.config.gabor_n_orientations))
+        ksize = int(self.config.gabor_ksize)
+        for i in range(n):
+            theta = np.pi * i / n
+            kernel = cv2.getGaborKernel(
+                (ksize, ksize),
+                self.config.gabor_sigma,
+                theta,
+                self.config.gabor_lambda,
+                self.config.gabor_gamma,
+                0,
+                ktype=cv2.CV_32F
+            )
+            kernel -= kernel.mean()  # resposta DC nula
+            kernels.append(kernel)
+        return kernels
+
+    # ------------------------------ algoritmos ------------------------------
+    def enhance_frangi(self, image: np.ndarray) -> np.ndarray:
+        """Realce de vascularização de Frangi (vesselness Hessiano multiescala)."""
+        gray = self._prep(image)
+        f = img_as_float(gray)
+        vessels = frangi(
+            f,
+            sigmas=self.config.frangi_sigmas,
+            beta=self.config.frangi_beta,
+            gamma=self.config.frangi_gamma,
+            black_ridges=self.config.frangi_black_ridges
+        )
+        return self._stretch_display(vessels)
+
+    def enhance_gabor(self, image: np.ndarray) -> np.ndarray:
+        """Resposta máxima de um banco de filtros de Gabor orientados."""
+        gray = self._prep(image).astype(np.float32)
+        response = np.zeros_like(gray)
+        for kernel in self._gabor_kernels:
+            filtered = cv2.filter2D(gray, cv2.CV_32F, kernel)
+            np.maximum(response, np.abs(filtered), out=response)
+        return self._to_uint8(response)
+
+    def enhance_blackhat(self, image: np.ndarray, mode: str = "both") -> np.ndarray:
+        """Top-hat/black-hat morfológico multiescala (estruturas finas)."""
+        gray = self._prep(image)
+        acc = np.zeros(gray.shape, dtype=np.float32)
+        for scale in self.config.morph_scales:
+            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (int(scale), int(scale)))
+            if mode in ("both", "black"):
+                acc += cv2.morphologyEx(gray, cv2.MORPH_BLACKHAT, kernel).astype(np.float32)
+            if mode in ("both", "top"):
+                acc += cv2.morphologyEx(gray, cv2.MORPH_TOPHAT, kernel).astype(np.float32)
+        return self._to_uint8(acc)
+
+    def enhance_vessels(self, image: np.ndarray) -> np.ndarray:
+        """Pipeline combinado padrão: Frangi (0.6) + black-hat (0.4)."""
+        frangi_map = self.enhance_frangi(image).astype(np.float32) / 255.0
+        morph_map = self.enhance_blackhat(image).astype(np.float32) / 255.0
+        combined = 0.6 * frangi_map + 0.4 * morph_map
+        return self._to_uint8(combined)
+
+    def enhance(self, image: np.ndarray, method: PhotometricTransform) -> np.ndarray:
+        """Despacha para o algoritmo de realce correspondente."""
+        dispatch = {
+            PhotometricTransform.FRANGI: self.enhance_frangi,
+            PhotometricTransform.GABOR: self.enhance_gabor,
+            PhotometricTransform.BLACKHAT: self.enhance_blackhat,
+            PhotometricTransform.VESSEL: self.enhance_vessels,
+        }
+        if method not in dispatch:
+            raise ValueError(f"Método de realce não suportado: {method}")
+        return dispatch[method](image)
+
+    # ------------------------------ métricas --------------------------------
+    @staticmethod
+    def quantify(enhanced: np.ndarray,
+                 mask: Optional[np.ndarray] = None) -> Dict[str, float]:
+        """
+        Métricas objetivas de visibilidade da vascularização (reportadas como
+        medidas, sem juízo de valor):
+
+        - structure_contrast: CNR (contrast-to-noise ratio) entre as estruturas
+          realçadas e o fundo, (média_estrutura - média_fundo) / desvio_fundo.
+          É a medida direta de "quão bem as fibras/vasos se separam do fundo",
+          o que de fato significa "mostrar melhor a vascularização".
+        - ridge_energy: energia de cristas/bordas (variância do Laplaciano),
+          normalizada; quanto das estruturas finas foi evidenciado.
+        - structure_density: fração de pixels acima do limiar de Otsu.
+        - rms_contrast: desvio-padrão das intensidades normalizado em [0,1].
+        - entropy: entropia de Shannon (riqueza de informação).
+        """
+        img = enhanced if enhanced.dtype == np.uint8 else VascularizationEnhancer._to_uint8(enhanced)
+        zero = {"structure_contrast": 0.0, "ridge_energy": 0.0,
+                "structure_density": 0.0, "rms_contrast": 0.0, "entropy": 0.0}
+        if mask is not None:
+            sel = mask > 0
+            values = img[sel]
+        else:
+            sel = np.ones(img.shape, dtype=bool)
+            values = img.ravel()
+        if values.size == 0:
+            return dict(zero)
+
+        otsu_thr, _ = cv2.threshold(img, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        density = float(np.mean(values > otsu_thr))
+        rms_contrast = float(np.std(values) / 255.0)
+        entropy = float(shannon_entropy(values))
+
+        # CNR estrutura-vs-fundo (dentro da máscara)
+        fg = img[sel & (img > otsu_thr)]
+        bg = img[sel & (img <= otsu_thr)]
+        if fg.size > 0 and bg.size > 0:
+            structure_contrast = float((float(fg.mean()) - float(bg.mean()))
+                                       / (float(np.std(bg)) + 1e-6))
+        else:
+            structure_contrast = 0.0
+
+        # Energia de cristas (variância do Laplaciano) normalizada, na máscara
+        lap = cv2.Laplacian(img, cv2.CV_64F, ksize=3)
+        ridge_energy = float(np.var(lap[sel]) / (255.0 ** 2))
+
+        return {
+            "structure_contrast": structure_contrast,
+            "ridge_energy": ridge_energy,
+            "structure_density": density,
+            "rms_contrast": rms_contrast,
+            "entropy": entropy,
+        }
 
 
 class ImagePreprocessor:
@@ -42,6 +254,9 @@ class ImagePreprocessor:
             clipLimit=self.config.clahe_clip_limit,
             tileGridSize=self.config.clahe_tile_grid_size
         )
+
+        # Realce de vascularização (Frangi / Gabor / black-hat)
+        self._vessel_enhancer = VascularizationEnhancer(self.config)
     
     def extract_channel(self, image: np.ndarray, 
                         channel: Optional[ColorChannel] = None) -> np.ndarray:
@@ -151,7 +366,13 @@ class ImagePreprocessor:
         
         elif transform == PhotometricTransform.BLUR:
             return self.apply_gaussian_blur(image)
-        
+
+        elif transform in (PhotometricTransform.FRANGI,
+                           PhotometricTransform.GABOR,
+                           PhotometricTransform.BLACKHAT,
+                           PhotometricTransform.VESSEL):
+            return self._vessel_enhancer.enhance(image, transform)
+
         else:
             raise ValueError(f"Transformação não suportada: {transform}")
     
@@ -308,6 +529,12 @@ class IrisNormalizer:
 def create_preprocessor(config: Optional[PreprocessingConfig] = None) -> ImagePreprocessor:
     """Factory function para criar pré-processador."""
     return ImagePreprocessor(config)
+
+
+def create_vascularization_enhancer(
+        config: Optional[PreprocessingConfig] = None) -> VascularizationEnhancer:
+    """Factory function para criar o realçador de vascularização."""
+    return VascularizationEnhancer(config)
 
 
 def create_normalizer(config: Optional[PreprocessingConfig] = None) -> IrisNormalizer:

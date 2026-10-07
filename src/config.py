@@ -55,17 +55,28 @@ class ClassifierType(Enum):
 
 class PhotometricTransform(Enum):
     """
-    Transformações fotométricas para teste de robustez.
-    
+    Transformações fotométricas e realces de vascularização.
+
+    Robustez (baseline):
     - ORIGINAL: sem transformação
     - HISTOGRAM: equalização global de histograma
     - CLAHE: Contrast Limited Adaptive Histogram Equalization
     - BLUR: Gaussian blur
+
+    Realce de vascularização/estroma (algoritmos consolidados em imagem médica):
+    - FRANGI: filtro de vascularização de Frangi (vesselness Hessiano multiescala)
+    - GABOR: resposta máxima de um banco de filtros de Gabor orientados
+    - BLACKHAT: top-hat/black-hat morfológico multiescala
+    - VESSEL: combinação ponderada padrão (0.6 Frangi + 0.4 black-hat)
     """
     ORIGINAL = "original"
     HISTOGRAM = "histogram"
     CLAHE = "clahe"
     BLUR = "blur"
+    FRANGI = "frangi"
+    GABOR = "gabor"
+    BLACKHAT = "blackhat"
+    VESSEL = "vessel"
 
 
 class FeatureType(Enum):
@@ -129,6 +140,35 @@ class SegmentationConfig:
     iris_snake_alpha: float = -0.1  # Negativo para expansão
     iris_snake_gamma: float = 0.001
     iris_convergence: float = 0.35
+
+
+# =============================================================================
+# Configuração da Validação de Pupila
+# =============================================================================
+
+@dataclass
+class PupilValidationConfig:
+    """
+    Limiares para validação/classificação da geometria pupila-íris.
+
+    Base fisiológica (olho humano adulto, iluminação normal):
+    - diâmetro da pupila ~ 2-8 mm, diâmetro da íris ~ 11-12 mm
+    - razão pupila/íris ~ 0.2-0.7 fora de dilatação/constrição extrema
+    - espessura relativa da íris = (r_iris - r_pupila) / r_iris
+    - excentricidade (offset dos centros) normalizada pelo raio da íris
+    """
+    # Razão diâmetro pupila/íris aceitável
+    min_pupil_iris_ratio: float = 0.20
+    max_pupil_iris_ratio: float = 0.70
+    # Faixa "borderline" (válida com ressalva)
+    borderline_low_ratio: float = 0.15
+    borderline_high_ratio: float = 0.80
+    # Espessura relativa mínima da íris (anel)
+    min_thickness_ratio: float = 0.25
+    # Excentricidade máxima (offset dos centros / raio da íris)
+    max_concentricity_offset: float = 0.30
+    # Escala opcional para converter pixels em milímetros (px/mm); None = desligado
+    pixels_per_mm: Optional[float] = None
 
 
 # =============================================================================
@@ -206,7 +246,22 @@ class PreprocessingConfig:
     # Parâmetros Gaussian Blur
     blur_kernel_size: Tuple[int, int] = (5, 5)
     blur_sigma: float = 0
-    
+
+    # --- Realce de vascularização (algoritmos consolidados) ---
+    # Frangi (vesselness Hessiano multiescala)
+    frangi_sigmas: Tuple[float, ...] = (1.0, 2.0, 3.0, 4.0)
+    frangi_beta: float = 0.5        # sensibilidade à "blobness" (plate vs line)
+    frangi_gamma: float = 15.0      # sensibilidade ao contraste de estrutura
+    frangi_black_ridges: bool = False  # False: realça fibras/cristas claras
+    # Banco de Gabor (fibras radiais/orientadas)
+    gabor_n_orientations: int = 8
+    gabor_ksize: int = 21
+    gabor_sigma: float = 4.0
+    gabor_lambda: float = 10.0
+    gabor_gamma: float = 0.5
+    # Top-hat / black-hat morfológico multiescala
+    morph_scales: Tuple[int, ...] = (5, 11, 21)
+
     # Normalização da íris (rubber sheet)
     normalized_height: int = 201
     normalized_width: int = 720

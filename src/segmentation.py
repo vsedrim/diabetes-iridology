@@ -15,8 +15,8 @@ Referência:
 
 import numpy as np
 import cv2
-from typing import Tuple, Optional, List, NamedTuple
-from dataclasses import dataclass
+from typing import Tuple, Optional, List, NamedTuple, Dict
+from dataclasses import dataclass, field
 import warnings
 
 from scipy.spatial import distance
@@ -24,7 +24,7 @@ from skimage.color import rgb2gray
 from skimage.filters import gaussian
 from skimage.segmentation import active_contour
 
-from .config import SegmentationConfig
+from .config import SegmentationConfig, PupilValidationConfig
 
 
 @dataclass
@@ -60,6 +60,211 @@ class SegmentationResult:
             'iris_radius': self.iris_radius,
             'success': self.success,
             'message': self.message
+        }
+
+
+@dataclass
+class PupilValidationResult:
+    """
+    Resultado da validação/classificação da geometria pupila-íris.
+
+    Attributes:
+        pupil_diameter: Diâmetro da pupila (px)
+        iris_diameter: Diâmetro da íris (px)
+        iris_thickness: Espessura do anel da íris, r_iris - r_pupila (px)
+        pupil_iris_ratio: Razão diâmetro pupila/íris
+        thickness_ratio: Espessura relativa, (r_iris - r_pupila)/r_iris
+        concentricity_offset: Distância entre centros normalizada pelo raio da íris
+        pupil_diameter_mm / iris_diameter_mm: diâmetros em mm (se px/mm informado)
+        is_valid: Se a geometria é fisiologicamente plausível
+        quality_label: "valid", "borderline" ou "invalid"
+        quality_score: Pontuação contínua de qualidade em [0, 1]
+        reasons: Lista de motivos que levaram à classificação
+    """
+    pupil_diameter: float = 0.0
+    iris_diameter: float = 0.0
+    iris_thickness: float = 0.0
+    pupil_iris_ratio: float = 0.0
+    thickness_ratio: float = 0.0
+    concentricity_offset: float = 0.0
+    pupil_diameter_mm: Optional[float] = None
+    iris_diameter_mm: Optional[float] = None
+    is_valid: bool = False
+    quality_label: str = "invalid"
+    quality_score: float = 0.0
+    reasons: List[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict:
+        return {
+            'pupil_diameter': round(self.pupil_diameter, 2),
+            'iris_diameter': round(self.iris_diameter, 2),
+            'iris_thickness': round(self.iris_thickness, 2),
+            'pupil_iris_ratio': round(self.pupil_iris_ratio, 4),
+            'thickness_ratio': round(self.thickness_ratio, 4),
+            'concentricity_offset': round(self.concentricity_offset, 4),
+            'pupil_diameter_mm': (round(self.pupil_diameter_mm, 2)
+                                  if self.pupil_diameter_mm is not None else None),
+            'iris_diameter_mm': (round(self.iris_diameter_mm, 2)
+                                 if self.iris_diameter_mm is not None else None),
+            'is_valid': self.is_valid,
+            'quality_label': self.quality_label,
+            'quality_score': round(self.quality_score, 3),
+            'reasons': list(self.reasons),
+        }
+
+
+class PupilValidator:
+    """
+    Valida e classifica a geometria pupila-íris.
+
+    Classifica a geometria pupila-íris (validação da pupila usando o diâmetro
+    da pupila e a espessura da íris). A classificação é baseada
+    em regras fisiológicas interpretáveis sobre três descritores:
+
+    1. Razão diâmetro pupila/íris (dilatação/constrição plausível)
+    2. Espessura relativa do anel da íris
+    3. Excentricidade (quão concêntricos são pupila e íris)
+
+    Além do rótulo, expõe um vetor de features (extract_features) pronto para
+    alimentar um classificador supervisionado (ex.: LogisticRegression/SVM),
+    caso se queira aprender os limiares a partir de dados rotulados.
+    """
+
+    FEATURE_NAMES: Tuple[str, ...] = (
+        "pupil_diameter",
+        "iris_diameter",
+        "iris_thickness",
+        "pupil_iris_ratio",
+        "thickness_ratio",
+        "concentricity_offset",
+    )
+
+    def __init__(self, config: Optional[PupilValidationConfig] = None):
+        self.config = config or PupilValidationConfig()
+
+    def validate(self,
+                 pupil_radius: float,
+                 iris_radius: float,
+                 pupil_center: Optional[Tuple[float, float]] = None,
+                 iris_center: Optional[Tuple[float, float]] = None
+                 ) -> PupilValidationResult:
+        """
+        Valida a geometria a partir de raios (e centros opcionais).
+
+        Args:
+            pupil_radius: Raio da pupila (px)
+            iris_radius: Raio da íris (px)
+            pupil_center: Centro da pupila (x, y), opcional
+            iris_center: Centro da íris (x, y), opcional
+
+        Returns:
+            PupilValidationResult preenchido e classificado.
+        """
+        cfg = self.config
+        result = PupilValidationResult()
+        reasons: List[str] = []
+
+        # Geometria básica
+        if iris_radius <= 0 or pupil_radius <= 0:
+            result.reasons = ["raios inválidos (<= 0)"]
+            return result
+        if iris_radius <= pupil_radius:
+            result.reasons = ["íris menor ou igual à pupila"]
+            result.pupil_diameter = 2.0 * pupil_radius
+            result.iris_diameter = 2.0 * iris_radius
+            return result
+
+        result.pupil_diameter = 2.0 * pupil_radius
+        result.iris_diameter = 2.0 * iris_radius
+        result.iris_thickness = float(iris_radius - pupil_radius)
+        result.pupil_iris_ratio = float(pupil_radius / iris_radius)
+        result.thickness_ratio = float((iris_radius - pupil_radius) / iris_radius)
+
+        # Excentricidade (se centros disponíveis)
+        if pupil_center is not None and iris_center is not None:
+            offset = float(np.hypot(pupil_center[0] - iris_center[0],
+                                    pupil_center[1] - iris_center[1]))
+            result.concentricity_offset = offset / float(iris_radius)
+
+        # Conversão opcional para mm
+        if cfg.pixels_per_mm:
+            result.pupil_diameter_mm = result.pupil_diameter / cfg.pixels_per_mm
+            result.iris_diameter_mm = result.iris_diameter / cfg.pixels_per_mm
+
+        # --- Regras de classificação ---
+        ratio = result.pupil_iris_ratio
+        score = 1.0
+
+        # 1) Razão pupila/íris
+        if ratio < cfg.borderline_low_ratio or ratio > cfg.borderline_high_ratio:
+            reasons.append(
+                f"razão pupila/íris {ratio:.2f} fora da faixa plausível "
+                f"[{cfg.borderline_low_ratio:.2f}, {cfg.borderline_high_ratio:.2f}]"
+            )
+            score -= 0.6
+        elif ratio < cfg.min_pupil_iris_ratio or ratio > cfg.max_pupil_iris_ratio:
+            reasons.append(
+                f"razão pupila/íris {ratio:.2f} na faixa de atenção "
+                f"[{cfg.min_pupil_iris_ratio:.2f}, {cfg.max_pupil_iris_ratio:.2f}]"
+            )
+            score -= 0.25
+
+        # 2) Espessura relativa da íris
+        if result.thickness_ratio < cfg.min_thickness_ratio:
+            reasons.append(
+                f"anel da íris fino demais (espessura relativa "
+                f"{result.thickness_ratio:.2f} < {cfg.min_thickness_ratio:.2f})"
+            )
+            score -= 0.3
+
+        # 3) Excentricidade
+        if result.concentricity_offset > cfg.max_concentricity_offset:
+            reasons.append(
+                f"centros pouco concêntricos (offset "
+                f"{result.concentricity_offset:.2f} > {cfg.max_concentricity_offset:.2f})"
+            )
+            score -= 0.3
+
+        score = float(max(0.0, min(1.0, score)))
+        result.quality_score = score
+
+        # Rótulo final
+        hard_fail = any("fora da faixa plausível" in r for r in reasons)
+        if hard_fail or score < 0.5:
+            result.quality_label = "invalid"
+            result.is_valid = False
+        elif score < 0.8 or reasons:
+            result.quality_label = "borderline"
+            result.is_valid = True
+        else:
+            result.quality_label = "valid"
+            result.is_valid = True
+
+        result.reasons = reasons if reasons else ["geometria dentro das faixas esperadas"]
+        return result
+
+    def validate_segmentation(self, seg: "SegmentationResult") -> PupilValidationResult:
+        """Valida a partir de um SegmentationResult do IrisSegmenter."""
+        if not seg.success:
+            res = PupilValidationResult()
+            res.reasons = [f"segmentação falhou: {seg.message}"]
+            return res
+        return self.validate(
+            pupil_radius=seg.pupil_radius,
+            iris_radius=seg.iris_radius,
+            pupil_center=seg.pupil_center,
+            iris_center=seg.iris_center,
+        )
+
+    def extract_features(self, result: PupilValidationResult) -> Dict[str, float]:
+        """Vetor de features (pronto para um classificador supervisionado)."""
+        return {
+            "pupil_diameter": result.pupil_diameter,
+            "iris_diameter": result.iris_diameter,
+            "iris_thickness": result.iris_thickness,
+            "pupil_iris_ratio": result.pupil_iris_ratio,
+            "thickness_ratio": result.thickness_ratio,
+            "concentricity_offset": result.concentricity_offset,
         }
 
 
@@ -459,3 +664,9 @@ def create_segmenter(config: Optional[SegmentationConfig] = None) -> IrisSegment
         IrisSegmenter configurado
     """
     return IrisSegmenter(config)
+
+
+def create_pupil_validator(
+        config: Optional[PupilValidationConfig] = None) -> PupilValidator:
+    """Factory function para criar o validador de pupila."""
+    return PupilValidator(config)
