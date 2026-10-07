@@ -44,7 +44,8 @@ diabetes-iridology-master/
 │   ├── Classifying.py
 │   ├── featureExtraction.py
 │   └── pre processing/
-└── img/                    # Imagens e figuras
+├── img/                    # Imagens e figuras
+└── docs/                   # Relatório e pôster da IC1 (LaTeX e PDF)
 ```
 
 ## 🚀 Instalação
@@ -206,6 +207,25 @@ Conforme metodologia do artigo, o dataset `personBase` tende a apresentar os mel
 | personBase | MLP | ~92.36% |
 | personBase | LR | ~90.81% |
 | personBase | SVM | ~88.24% |
+
+## Relatório e pôster da IC1
+
+A pasta [`docs/`](docs/) tem o material acadêmico da IC1:
+
+- [`relatorio_final_2026_IC.tex`](docs/relatorio_final_2026_IC.tex) e o
+  [PDF](docs/relatorio_final_2026_IC.pdf): relatório final.
+- [`Relatorio_parcial.tex`](docs/Relatorio_parcial.tex): relatório parcial.
+- [`poster_IC_2026.tex`](docs/poster_IC_2026.tex) e o [PDF](docs/poster_IC_2026.pdf): pôster A0.
+  A versão de 90 x 120 cm está em [`docs/versao_90x120/`](docs/versao_90x120/).
+- [`poster_LEIA-ME.md`](docs/poster_LEIA-ME.md): compilação, validação, ressalvas científicas e
+  licenças das imagens.
+
+Os números do relatório são preliminares. A auditoria feita depois no PGC encontrou 73 linhas
+duplicadas entre as 196 da base legada, e a avaliação antiga não demonstrava separação por pessoa.
+Por isso os valores próximos de 92% precisam ser recalculados.
+
+O trabalho continua em dois repositórios: o PGC em [`vsedrim/Iris`](https://github.com/vsedrim/Iris)
+e a IC2 em [`vsedrim/Iris-IC2`](https://github.com/vsedrim/Iris-IC2).
 
 ## 📁 Dataset
 
