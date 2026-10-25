@@ -1,0 +1,18 @@
+% Gerado por experiments/pgc3_vascular_pipeline.py (não editar à mão).
+\begin{tabular}{lccccc}
+\toprule
+\multirow{2}{*}{Representação} & Faixa inteira & \multicolumn{2}{c}{Só estroma} & \multicolumn{2}{c}{Só bordas} \\
+\cmidrule(lr){3-4}\cmidrule(lr){5-6}
+ & AB & AB & $\Delta$ ($p$ Holm) & AB & $\Delta$ ($p$ Holm) \\
+\midrule
+Original (cinza) & 0,699 & 0,632 & -- & 0,704 & -- \\
+Equalização global & 0,740 & 0,659 & $+$0,027 (1,000) & 0,751 & $+$0,047 (0,319) \\
+CLAHE & 0,711 & 0,638 & $+$0,006 (1,000) & 0,725 & $+$0,021 (0,795) \\
+Verde + CLAHE & 0,711 & 0,635 & $+$0,004 (1,000) & 0,711 & $+$0,007 (0,795) \\
+\midrule
+Frangi & 0,767 & 0,609 & $-$0,022 (1,000) & 0,814 & \textbf{$+$0,110 (0,002)} \\
+Gabor & 0,750 & 0,597 & $-$0,035 (1,000) & 0,811 & \textbf{$+$0,107 (0,003)} \\
+\textit{Black-hat} & 0,773 & 0,702 & $+$0,070 (0,207) & 0,779 & $+$0,075 (0,080) \\
+Frangi + \textit{black-hat} & 0,772 & 0,642 & $+$0,011 (1,000) & 0,794 & \textbf{$+$0,090 (0,038)} \\
+\bottomrule
+\end{tabular}

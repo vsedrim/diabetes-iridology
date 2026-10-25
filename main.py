@@ -45,7 +45,13 @@ from src.config import (
     ColorChannel,
     get_default_config
 )
-from src.segmentation import IrisSegmenter, SegmentationResult, create_segmenter
+from src.segmentation import (
+    IrisSegmenter,
+    SegmentationResult,
+    PupilValidator,
+    create_segmenter,
+    detect_eye_circles
+)
 from src.normalization import (
     IrisNormalizer, 
     NormalizationResult, 
@@ -58,6 +64,21 @@ from src.feature_extraction import FeatureExtractor, create_feature_extractor
 from src.classifiers import CrossValidator, ClassifierFactory, ClassificationResult
 from src.metrics import MetricsCalculator, MetricsResult, format_metrics_table, format_confusion_matrix
 from src.local_analysis import LocalAnalysisPipeline, SectorAnalysisResult, GridAnalysisResult
+from src.legacy_data import read_layout_arrays, read_layout_member, repair_angular_seam, sha256_bytes
+from src.fusion import GEOMETRY_FEATURES, evaluate_geometry_fusion
+
+# Os realces de vascularização trabalham sobre o canal verde (ver VascularizationEnhancer).
+VASCULAR_TRANSFORMS = (
+    PhotometricTransform.FRANGI,
+    PhotometricTransform.GABOR,
+    PhotometricTransform.BLACKHAT,
+    PhotometricTransform.VESSEL,
+)
+
+
+def default_channel_for(transform: PhotometricTransform) -> ColorChannel:
+    """Canal padrão de cada transformação: verde para os realces vasculares, cinza para as demais."""
+    return ColorChannel.G if transform in VASCULAR_TRANSFORMS else ColorChannel.GRAY
 
 
 class IridologyPipeline:
@@ -106,6 +127,9 @@ class IridologyPipeline:
         
         # Cache de dados carregados
         self._data_cache = {}
+
+        # Validação/medição da geometria pupila-íris (diâmetros, espessura, excentricidade)
+        self.pupil_validator = PupilValidator()
         
         # Resultados
         self.results = {}
@@ -117,22 +141,33 @@ class IridologyPipeline:
     def process_raw_images(self, images_path: str, 
                            output_path: Optional[str] = None,
                            labels_file: Optional[str] = None,
-                           verbose: bool = True) -> Tuple[np.ndarray, np.ndarray]:
+                           verbose: bool = True,
+                           segmenter: str = "contornos",
+                           return_geometry: bool = False):
         """
         Processa imagens raw: segmentação + normalização.
         
         Esta função implementa as etapas 3 e 4 do pipeline do artigo:
         - Segmentação e delimitação anatômica
         - Normalização geométrica (rubber sheet)
+
+        Além da faixa normalizada, mede a geometria pupila-íris de cada foto
+        (``PupilValidator``). A normalização descarta o tamanho da pupila, então
+        essa geometria só chega ao classificador como um bloco explícito.
         
         Args:
             images_path: Caminho para pasta com imagens (subpastas por classe)
             output_path: Caminho para salvar imagens processadas
             labels_file: Arquivo JSON com mapeamento imagem->label
             verbose: Se True, mostra progresso
+            segmenter: "contornos" (contornos ativos da IC) ou "starburst"
+                (raios em estrela + RANSAC + refinamento integro-diferencial)
+            return_geometry: Se True, devolve também a matriz geométrica
             
         Returns:
-            Tupla (normalized_images, labels)
+            Tupla (normalized_images, labels) ou, com ``return_geometry``,
+            (normalized_images, labels, geometry), em que as colunas de
+            ``geometry`` seguem ``PupilValidator.FEATURE_NAMES``.
         """
         import cv2
         import glob
@@ -144,6 +179,8 @@ class IridologyPipeline:
         
         all_images = []
         all_labels = []
+        all_geometry = []
+        geometry_rows = []
         success_count = 0
         fail_count = 0
         
@@ -154,22 +191,33 @@ class IridologyPipeline:
                 label_map = json.load(f)
         
         # Procura imagens em subpastas (assumindo estrutura: control/, diabetic/)
+        # Em sistemas de arquivos que ignoram maiúsculas (Windows), "control" e
+        # "Control", ou "*.png" e "*.PNG", apontam para os mesmos arquivos; cada
+        # pasta e cada arquivo é processado uma única vez para não criar cópias
+        # que vazariam entre os folds da validação cruzada.
+        seen_dirs = set()
         for class_name, label in [('control', 0), ('Control', 0), 
                                    ('diabetic', 1), ('Diabetic', 1),
                                    ('DM2', 1), ('healthy', 0)]:
             class_path = os.path.join(images_path, class_name)
             if not os.path.exists(class_path):
                 continue
+            dir_key = os.path.normcase(os.path.realpath(class_path))
+            if dir_key in seen_dirs:
+                continue
+            seen_dirs.add(dir_key)
             
             if verbose:
                 print(f"\nProcessando classe: {class_name} (label={label})")
             
             # Encontra imagens
             patterns = ['*.jpg', '*.jpeg', '*.png', '*.bmp', '*.tif', '*.tiff']
-            image_files = []
+            found = {}
             for pattern in patterns:
-                image_files.extend(glob.glob(os.path.join(class_path, pattern)))
-                image_files.extend(glob.glob(os.path.join(class_path, pattern.upper())))
+                for p in (glob.glob(os.path.join(class_path, pattern))
+                          + glob.glob(os.path.join(class_path, pattern.upper()))):
+                    found.setdefault(os.path.normcase(os.path.realpath(p)), p)
+            image_files = sorted(found.values())
             
             if verbose:
                 print(f"  Encontradas {len(image_files)} imagens")
@@ -184,17 +232,28 @@ class IridologyPipeline:
                         fail_count += 1
                         continue
                     
-                    # Segmenta
-                    seg_result = self.segmenter.segment(img)
-                    
-                    if not seg_result.success:
-                        if verbose:
-                            print(f"  Falha na segmentação: {os.path.basename(img_path)}")
-                        fail_count += 1
-                        continue
-                    
-                    # Normaliza
-                    norm_result = self.normalizer.normalize(img, seg_result)
+                    # Segmenta e normaliza
+                    if segmenter == "starburst":
+                        det = detect_eye_circles(img)
+                        norm_result = self.normalizer.normalize_from_circles(
+                            img, det["pupil_center"], det["pupil_radius"],
+                            det["iris_center"], det["iris_radius"]
+                        )
+                        validation = self.pupil_validator.validate(
+                            det["pupil_radius"], det["iris_radius"],
+                            det["pupil_center"], det["iris_center"]
+                        )
+                    else:
+                        seg_result = self.segmenter.segment(img)
+                        
+                        if not seg_result.success:
+                            if verbose:
+                                print(f"  Falha na segmentação: {os.path.basename(img_path)}")
+                            fail_count += 1
+                            continue
+                        
+                        norm_result = self.normalizer.normalize(img, seg_result)
+                        validation = self.pupil_validator.validate_segmentation(seg_result)
                     
                     if not norm_result.success:
                         if verbose:
@@ -204,6 +263,11 @@ class IridologyPipeline:
                     
                     all_images.append(norm_result.normalized_image)
                     all_labels.append(label)
+                    geometry = self.pupil_validator.extract_features(validation)
+                    all_geometry.append([geometry[n] for n in PupilValidator.FEATURE_NAMES])
+                    geometry_rows.append({"arquivo": os.path.relpath(img_path, images_path),
+                                          "rotulo": label, **geometry,
+                                          "rotulo_validador": validation.quality_label})
                     success_count += 1
                     
                 except Exception as e:
@@ -240,12 +304,24 @@ class IridologyPipeline:
                 # Cria arquivo DR_type vazio (placeholder)
                 with open(os.path.join(output_path, 'DR_type.p'), 'wb') as f:
                     pickle.dump(np.zeros(len(diabetic_images)), f)
+
+                # Geometria pupila-íris medida em cada foto (a faixa não a preserva)
+                import csv
+                with open(os.path.join(output_path, 'geometria.csv'), 'w', newline='',
+                          encoding='utf-8') as f:
+                    writer = csv.DictWriter(f, fieldnames=list(geometry_rows[0].keys()))
+                    writer.writeheader()
+                    writer.writerows(geometry_rows)
                 
                 if verbose:
                     print(f"Imagens salvas em: {output_path}")
             
+            if return_geometry:
+                return normalized_array, labels_array, np.array(all_geometry, dtype=np.float32)
             return normalized_array, labels_array
         else:
+            if return_geometry:
+                return np.array([]), np.array([]), np.empty((0, len(PupilValidator.FEATURE_NAMES)))
             return np.array([]), np.array([])
     
     def segment_single_image(self, image_path: str,
@@ -342,19 +418,22 @@ class IridologyPipeline:
         
         print(f"Carregando dataset: {dataset_type.value} de {dataset_path}")
         
-        # Carrega arquivos pickle
-        control_path = os.path.join(dataset_path, self.config.data.control_file)
-        diabetic_path = os.path.join(dataset_path, self.config.data.diabetic_file)
-        dr_type_path = os.path.join(dataset_path, self.config.data.dr_type_file)
-        
-        with open(control_path, 'rb') as f:
-            control_images = pickle.load(f, encoding='latin1')
-        
-        with open(diabetic_path, 'rb') as f:
-            diabetic_images = pickle.load(f, encoding='latin1')
-        
-        with open(dr_type_path, 'rb') as f:
-            dr_labels = pickle.load(f, encoding='latin1')
+        # Carrega os pickles legados sem executar código arbitrário (só ndarray do NumPy)
+        control_images, diabetic_images = read_layout_arrays(
+            self.config.data.data_root, dataset_type.value
+        )
+        dr_labels = read_layout_member(
+            self.config.data.data_root, dataset_type.value, self.config.data.dr_type_file
+        )
+
+        if self.config.data.deduplicate:
+            control_images, _ = self._deduplicate(control_images)
+            diabetic_images, keep = self._deduplicate(diabetic_images)
+            dr_labels = np.asarray(dr_labels)[keep]
+            control_images = np.stack([repair_angular_seam(im)[0] for im in control_images])
+            diabetic_images = np.stack([repair_angular_seam(im)[0] for im in diabetic_images])
+            print("  Cópias exatas removidas e costura angular reparada "
+                  "(use --keep-duplicates para o comportamento legado)")
         
         print(f"  Control: {control_images.shape}")
         print(f"  Diabetic: {diabetic_images.shape}")
@@ -362,6 +441,18 @@ class IridologyPipeline:
         self._data_cache[cache_key] = (control_images, diabetic_images, dr_labels)
         
         return control_images, diabetic_images, dr_labels
+
+    @staticmethod
+    def _deduplicate(images: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """Mantém a primeira ocorrência de cada imagem (SHA-256 dos pixels)."""
+        seen, keep = set(), []
+        for i, image in enumerate(images):
+            digest = sha256_bytes(image)
+            if digest not in seen:
+                seen.add(digest)
+                keep.append(i)
+        keep = np.asarray(keep, dtype=np.int64)
+        return images[keep], keep
     
     def prepare_data(self, dataset_type: DatasetType,
                      channel: ColorChannel = ColorChannel.GRAY,
@@ -504,6 +595,35 @@ class IridologyPipeline:
         
         self.results['robustness'] = robustness_results
         return robustness_results
+
+    def run_vascular_test(self,
+                          dataset_type: DatasetType = DatasetType.PERSON_BASE_INVERT
+                          ) -> Dict[str, Dict[str, ClassificationResult]]:
+        """
+        Usa as imagens filtradas diretamente como entrada do pipeline da IC.
+
+        Cada realce (Frangi, Gabor, black-hat e a combinação Frangi +
+        black-hat) substitui a imagem original antes da extração de features;
+        o restante do pipeline (features, classificadores e validação cruzada)
+        não muda. As linhas de base são a imagem original, a equalização global
+        e o CLAHE. Os realces usam o canal verde; as linhas de base, o cinza.
+        """
+        transforms = [PhotometricTransform.ORIGINAL, PhotometricTransform.HISTOGRAM,
+                      PhotometricTransform.CLAHE, *VASCULAR_TRANSFORMS]
+        vascular_results = {}
+
+        print(f"\n{'='*60}")
+        print("IMAGENS FILTRADAS COMO ENTRADA DO PIPELINE")
+        print(f"Dataset: {dataset_type.value}")
+        print(f"{'='*60}")
+
+        for transform in transforms:
+            channel = default_channel_for(transform)
+            print(f"\n--- Entrada: {transform.value} (canal {channel.value}) ---")
+            vascular_results[transform.value] = self.run_classification(dataset_type, channel, transform)
+
+        self.results['robustness'] = vascular_results
+        return vascular_results
     
     def run_local_analysis(self, 
                             dataset_type: DatasetType = DatasetType.PERSON_BASE,
@@ -711,12 +831,19 @@ Exemplos de uso:
   python main.py --robustness-test
   python main.py --local-analysis --eye-side left
 
+  # Imagens filtradas como entrada direta do pipeline (PGC III)
+  python main.py --dataset personBase_invert --transform frangi
+  python main.py --vascular-test --dataset personBase_invert
+
   # Processamento de imagens raw (segmentação + normalização)
   python main.py --process-raw --raw-path ./raw_images --output-processed ./processed
   python main.py --segment-single --image-path ./image.jpg
   
   # Pipeline completo: raw -> classificação
   python main.py --full-pipeline --raw-path ./raw_images
+
+  # Pipeline completo com a geometria da pupila medida na foto (fusão)
+  python main.py --full-pipeline --raw-path ./raw_images --with-geometry
         """
     )
     
@@ -731,9 +858,46 @@ Exemplos de uso:
     parser.add_argument(
         '--channel',
         type=str,
-        default='gray',
+        default=None,
         choices=['gray', 'h', 's', 'v', 'r', 'g', 'b'],
-        help='Canal de cor'
+        help='Canal de cor (padrão: verde para os realces vasculares, cinza para os demais)'
+    )
+
+    parser.add_argument(
+        '--transform',
+        type=str,
+        default='original',
+        choices=[t.value for t in PhotometricTransform],
+        help='Imagem de entrada do pipeline: original, transformação fotométrica ou realce '
+             'de vascularização (frangi, gabor, blackhat, vessel)'
+    )
+
+    parser.add_argument(
+        '--vascular-test',
+        action='store_true',
+        help='Compara a imagem original com as imagens filtradas como entrada do pipeline'
+    )
+
+    parser.add_argument(
+        '--keep-duplicates',
+        action='store_true',
+        help='Mantém as cópias exatas da base legada (comportamento anterior, com vazamento)'
+    )
+
+    parser.add_argument(
+        '--segmenter',
+        type=str,
+        default=None,
+        choices=['contornos', 'starburst'],
+        help='Segmentação das imagens raw: contornos ativos (padrão) ou starburst + refinamento '
+             'integro-diferencial (padrão com --with-geometry)'
+    )
+
+    parser.add_argument(
+        '--with-geometry',
+        action='store_true',
+        help='No --full-pipeline, funde as features da faixa com a geometria da pupila '
+             '(razão pupila/íris, espessura relativa e excentricidade) medida na foto'
     )
     
     parser.add_argument(
@@ -822,6 +986,7 @@ Exemplos de uso:
     config = get_default_config()
     config.data.data_root = args.data_path
     config.data.output_dir = args.output_dir
+    config.data.deduplicate = not args.keep_duplicates
     
     # Inicializa pipeline
     pipeline = IridologyPipeline(config)
@@ -844,6 +1009,10 @@ Exemplos de uso:
         'g': ColorChannel.G,
         'b': ColorChannel.B
     }
+
+    transform = PhotometricTransform(args.transform)
+    channel = channel_map[args.channel] if args.channel else default_channel_for(transform)
+    segmenter = args.segmenter or ('starburst' if args.with_geometry else 'contornos')
     
     # Executa
     try:
@@ -883,7 +1052,8 @@ Exemplos de uso:
             normalized, labels = pipeline.process_raw_images(
                 args.raw_path,
                 args.output_processed,
-                verbose=True
+                verbose=True,
+                segmenter=segmenter
             )
             
             print(f"\nImagens processadas: {len(normalized)}")
@@ -902,29 +1072,47 @@ Exemplos de uso:
             
             # Etapa 1: Processar imagens raw
             print("\n[ETAPA 1/3] Processamento de imagens raw...")
-            normalized, labels = pipeline.process_raw_images(
+            processed = pipeline.process_raw_images(
                 args.raw_path,
                 args.output_processed,
-                verbose=True
+                verbose=True,
+                segmenter=segmenter,
+                return_geometry=args.with_geometry
             )
+            normalized, labels = processed[0], processed[1]
             
             if len(normalized) == 0:
                 print("Erro: Nenhuma imagem foi processada com sucesso")
                 sys.exit(1)
             
-            # Etapa 2: Extração de features
+            # Etapa 2: Extração de features (mesma entrada escolhida em --transform/--channel)
             print("\n[ETAPA 2/3] Extração de features...")
             all_features = []
             for img in normalized:
-                if len(img.shape) == 3:
-                    img = img[:, :, 0]  # Usa primeiro canal
-                features = pipeline.feature_extractor.extract_features(img)
+                strip = pipeline.preprocessor.preprocess(img, channel, transform)
+                features = pipeline.feature_extractor.extract_features(strip)
                 all_features.append(features)
             
             X = np.array(all_features, dtype=np.float32)
             y = labels.astype(np.int32)
             
             print(f"  Features shape: {X.shape}")
+
+            if args.with_geometry:
+                # Etapa 3: textura, geometria e fusão com a mesma validação cruzada
+                print("\n[ETAPA 3/3] Classificação: textura, geometria da pupila e fusão...")
+                columns = [PupilValidator.FEATURE_NAMES.index(n) for n in GEOMETRY_FEATURES]
+                geometry = processed[2][:, columns]
+                fusion = evaluate_geometry_fusion(X, geometry, y)
+                print("\n" + "=" * 60)
+                print("RESULTADOS (regressão logística, VC estratificada 5 x 5)")
+                print("=" * 60)
+                for name, label in (("textura", "Faixa normalizada"), ("geometria", "Geometria da pupila"),
+                                    ("fusao", "Fusão (empilhamento)")):
+                    r = fusion[name]
+                    print(f"  {label}: AUC {r['auc_media']:.4f} ± {r['auc_dp']:.4f}; "
+                          f"acurácia balanceada {r['bal_acc_media']:.4f} ± {r['bal_acc_dp']:.4f}")
+                return
             
             # Etapa 3: Classificação
             print("\n[ETAPA 3/3] Classificação...")
@@ -946,7 +1134,7 @@ Exemplos de uso:
             print("\n" + "=" * 60)
             print("EXECUTANDO ANÁLISE EM TODOS OS DATASETS")
             print("=" * 60)
-            results = pipeline.run_all_datasets(channel_map[args.channel])
+            results = pipeline.run_all_datasets(channel, transform)
             
             # Imprime tabela de acurácia
             print(create_accuracy_table(results))
@@ -956,6 +1144,12 @@ Exemplos de uso:
             print("EXECUTANDO TESTE DE ROBUSTEZ")
             print("=" * 60)
             pipeline.run_robustness_test(dataset_map[args.dataset])
+
+        elif args.vascular_test:
+            print("\n" + "=" * 60)
+            print("EXECUTANDO O TESTE DAS IMAGENS FILTRADAS")
+            print("=" * 60)
+            pipeline.run_vascular_test(dataset_map[args.dataset])
         
         elif args.local_analysis:
             print("\n" + "=" * 60)
@@ -969,11 +1163,13 @@ Exemplos de uso:
         
         else:
             print("\n" + "=" * 60)
-            print(f"EXECUTANDO ANÁLISE NO DATASET: {args.dataset}")
+            print(f"EXECUTANDO ANÁLISE NO DATASET: {args.dataset} (entrada: {transform.value}, "
+                  f"canal {channel.value})")
             print("=" * 60)
             results = pipeline.run_classification(
                 dataset_map[args.dataset],
-                channel_map[args.channel]
+                channel,
+                transform
             )
             
             # Imprime resultados

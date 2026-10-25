@@ -26,7 +26,10 @@ from .segmentation import (
     PupilValidator,
     PupilValidationResult,
     create_segmenter,
-    create_pupil_validator
+    create_pupil_validator,
+    detect_eye_circles,
+    refine_circle,
+    ransac_circle
 )
 
 from .normalization import (
@@ -76,6 +79,26 @@ from .local_analysis import (
 from .results_generator import (
     ResultsGenerator,
     create_results_generator
+)
+
+from .legacy_data import (
+    LegacyDataset,
+    load_legacy_layout,
+    resolve_legacy_source,
+    restricted_numpy_load
+)
+
+from .fusion import (
+    GEOMETRY_FEATURES,
+    build_fusion_classifier,
+    evaluate_geometry_fusion
+)
+
+from .synthetic_eye import (
+    EyeGeometry,
+    rubber_sheet_coordinates,
+    sample_synthetic_eye,
+    simulate_pupil_dilation
 )
 
 __version__ = "2.0.0"

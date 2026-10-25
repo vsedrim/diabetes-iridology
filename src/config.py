@@ -214,6 +214,11 @@ class DataConfig:
     diabetic_file: str = "diabeteImageArr.p"
     dr_type_file: str = "DR_type.p"
     control_manner_file: str = "controllingManner.p"
+
+    # Auditoria da base legada: remove cópias exatas (SHA-256) e repara a coluna
+    # nula da costura angular antes de qualquer validação cruzada. A base tem
+    # 196 linhas por leiaute de pessoa, mas só 123 imagens distintas.
+    deduplicate: bool = True
     
     def get_dataset_path(self, dataset: DatasetType) -> str:
         """Retorna o caminho completo para um dataset."""

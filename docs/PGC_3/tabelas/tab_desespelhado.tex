@@ -1,0 +1,18 @@
+% Gerado por experiments/pgc3_vascular_pipeline.py (não editar à mão).
+\begin{tabular}{lcccc}
+\toprule
+\multirow{2}{*}{Representação} & \multicolumn{3}{c}{AB média com pixels} & \multirow{2}{*}{\makecell{$\Delta$ ao desfazer\\o espelhamento ($p$)}} \\
+\cmidrule(lr){2-4}
+ & \makecell{\texttt{personBase\_invert}\\(espelhado)} & \makecell{\texttt{personBase\_invert}\\(desespelhado)} & \texttt{personBase} & \\
+\midrule
+Original (cinza) & 0,699 & 0,752 & 0,793 & $+$0,053 (0,064) \\
+Equalização global & 0,740 & 0,778 & 0,796 & $+$0,038 (0,179) \\
+CLAHE & 0,711 & 0,772 & 0,780 & $+$0,062 (0,017) \\
+Verde + CLAHE & 0,711 & 0,761 & 0,789 & $+$0,050 (0,087) \\
+\midrule
+Frangi & 0,767 & 0,773 & 0,802 & $+$0,007 (0,747) \\
+Gabor & 0,750 & 0,779 & 0,820 & $+$0,029 (0,202) \\
+\textit{Black-hat} & 0,773 & 0,774 & 0,787 & $+$0,001 (0,968) \\
+Frangi + \textit{black-hat} & 0,772 & 0,787 & 0,787 & $+$0,015 (0,481) \\
+\bottomrule
+\end{tabular}
