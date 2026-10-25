@@ -14,6 +14,7 @@ Referência:
     "Iridologia sob Lentes Científicas: Avaliação Crítica com Aprendizado de Máquina"
 """
 
+import inspect
 import numpy as np
 from typing import Dict, List, Tuple, Optional, Any
 from dataclasses import dataclass, field
@@ -161,11 +162,15 @@ class ClassifierFactory:
             )
         
         elif classifier_type == ClassifierType.ADABOOST:
-            return AdaBoostClassifier(
-                n_estimators=self.config.adaboost_n_estimators,
-                algorithm=self.config.adaboost_algorithm,
-                random_state=self.config.random_state
-            )
+            params = {
+                "n_estimators": self.config.adaboost_n_estimators,
+                "random_state": self.config.random_state,
+            }
+            # O scikit-learn 1.8 removeu o parâmetro "algorithm" (só resta o SAMME);
+            # ele só é repassado às versões que ainda o aceitam.
+            if "algorithm" in inspect.signature(AdaBoostClassifier.__init__).parameters:
+                params["algorithm"] = self.config.adaboost_algorithm
+            return AdaBoostClassifier(**params)
         
         else:
             raise ValueError(f"Tipo de classificador não suportado: {classifier_type}")
