@@ -24,19 +24,27 @@ diabetes-iridology-master/
 ├── src/                    # Módulos do projeto
 │   ├── __init__.py         # Inicialização do pacote
 │   ├── config.py           # Configurações centralizadas
-│   ├── segmentation.py     # Segmentação de íris/pupila + validação de pupila
+│   ├── segmentation.py     # Segmentação, validação e medição da pupila (starburst)
 │   ├── normalization.py    # Normalização rubber sheet (Daugman)
 │   ├── preprocessing.py    # Transformações fotométricas + realce de vascularização
 │   ├── feature_extraction.py # Extração de features
 │   ├── classifiers.py      # Classificadores ML
 │   ├── metrics.py          # Métricas de avaliação
 │   ├── local_analysis.py   # Análise por regiões
-│   └── results_generator.py # Geração de relatórios
-├── experiments/            # Demonstração e experimentos do PGC II
+│   ├── results_generator.py # Geração de relatórios
+│   ├── legacy_data.py      # Leitura segura e auditoria da base legada
+│   ├── model_comparison.py # Nadeau-Bengio, Holm, Friedman/Nemenyi, permutação
+│   ├── fusion.py           # Fusão da textura com a geometria da pupila
+│   └── synthetic_eye.py    # Olhos sintéticos e inversa exata do rubber sheet
+├── experiments/            # Demonstração e experimentos do PGC II e do PGC III
 │   ├── demo_vascularization_pupil.py
-│   └── report_experiments.py
+│   ├── report_experiments.py
+│   ├── pgc3_vascular_pipeline.py  # imagens filtradas no pipeline da IC
+│   ├── pgc3_pupil_geometry.py     # geometria da pupila
+│   └── pgc3_numbers.py            # números citados no relatório do PGC III
 ├── tests/                  # Testes unitários (unittest)
-│   └── test_vascularization_and_pupil.py
+│   ├── test_vascularization_and_pupil.py
+│   └── test_pgc3.py
 ├── Data/
 │   └── Data/
 │       ├── all/            # Todos os dados
@@ -51,7 +59,8 @@ diabetes-iridology-master/
 │   └── pre processing/
 ├── img/                    # Imagens e figuras
 └── docs/                   # Relatório e pôster da IC1 (LaTeX e PDF)
-    └── PGC_2/              # Relatório parcial do PGC II (ABNT)
+    ├── PGC_2/              # Relatório parcial do PGC II (ABNT)
+    └── PGC_3/              # Resultados preliminares para o PGC III (ABNT)
 ```
 
 ## 🚀 Instalação
@@ -101,7 +110,18 @@ python main.py --robustness-test --dataset personBase
 
 # Análise local por região
 python main.py --local-analysis --eye-side left --dataset personBase
+
+# Imagem filtrada como entrada direta do pipeline (frangi, gabor, blackhat ou vessel)
+python main.py --dataset personBase_invert --transform frangi
+
+# Original, equalização, CLAHE e os quatro realces com os mesmos descritores e classificadores
+python main.py --vascular-test --dataset personBase_invert
 ```
+
+Os arquivos da base são lidos por um desserializador restrito, que só aceita arrays do NumPy. Por
+padrão, as cópias exatas (73 das 196 linhas de cada leiaute por pessoa) são removidas e a coluna
+nula da costura angular é reparada antes da validação cruzada. `--keep-duplicates` restaura o
+comportamento antigo, que deixa cópias da mesma imagem em folds diferentes.
 
 ### Processamento de Imagens Raw (Novas Imagens)
 
@@ -115,7 +135,16 @@ python main.py --process-raw --raw-path ./raw_images --output-processed ./proces
 
 # Pipeline completo: raw -> segmentação -> normalização -> classificação
 python main.py --full-pipeline --raw-path ./raw_images
+
+# Pipeline completo com a geometria da pupila medida em cada foto (razão pupila/íris,
+# espessura relativa e excentricidade) fundida às features da faixa
+python main.py --full-pipeline --raw-path ./raw_images --with-geometry
 ```
+
+`--with-geometry` usa o detector `starburst` (raios em estrela, RANSAC e refinamento
+integro-diferencial), grava `geometria.csv` junto das faixas e compara textura, geometria e fusão
+com a mesma validação cruzada. A faixa normalizada descarta o tamanho da pupila, por isso a
+geometria precisa desse caminho próprio (ver a seção do PGC III).
 
 ## 📊 Metodologia
 
@@ -285,6 +314,10 @@ Conforme metodologia do artigo, o dataset `personBase` tende a apresentar os mel
 | personBase | LR | ~90.81% |
 | personBase | SVM | ~88.24% |
 
+> Esses valores vêm do artigo associado à base, que foi retratado, e de uma avaliação que mantinha
+> as 73 cópias exatas de cada leiaute. Os números recalculados após a auditoria (cópias removidas,
+> validação cruzada estratificada repetida) estão na seção do PGC III.
+
 ## Relatório e pôster da IC1
 
 A pasta [`docs/`](docs/) tem o material acadêmico da IC1:
@@ -325,6 +358,66 @@ script a tabela de tempos pode não bater com os valores citados no texto.
 Os experimentos usam as duas fotografias públicas de [`docs/imagens/`](docs/imagens/), porque o
 conjunto rotulado para DM2 não estava disponível nesta etapa. Os resultados verificam o
 funcionamento dos métodos e não sustentam conclusões clínicas.
+
+## Resultados preliminares do PGC III
+
+A pasta [`docs/PGC_3/`](docs/PGC_3/) tem um relatório técnico autocontido, no formato da ABNT, que
+responde às duas perguntas da orientação:
+[`resultados_preliminares_pgc3.tex`](docs/PGC_3/resultados_preliminares_pgc3.tex) e o
+[PDF](docs/PGC_3/resultados_preliminares_pgc3.pdf). Todos os números do texto vêm de
+`tabelas/numeros.tex`, gerado a partir das saídas dos experimentos.
+
+**1. As imagens filtradas podem entrar diretamente no pipeline da IC?** Sim. Os realces (Frangi,
+Gabor, *black-hat* e Frangi + *black-hat*) viraram entradas do pipeline (`--transform`,
+`--vascular-test`) e foram avaliados em 120 configurações (8 representações x 3 conjuntos de
+features x 5 classificadores), com validação cruzada estratificada 10 x 5 sobre as 123 imagens
+únicas da base auditada:
+
+- todas as representações classificam acima do acaso (teste de permutação, p = 0,001);
+- no leiaute `personBase_invert`, com o vetor de pixels, os realces superam a imagem original em
+  20 de 20 combinações (acurácia balanceada média de 0,699 para 0,750 a 0,773), e a ablação
+  verde + CLAHE (0,711) mostra que a diferença vem do filtro;
+- três controles mostram que esse ganho não indica vascularização: ele não se repete no leiaute
+  `personBase` (10 de 20); desfazer o espelhamento das faixas do olho direito leva a imagem
+  original de 0,699 para 0,752, enquanto os realces quase não mudam; e, com apenas o estroma
+  (r de 0,10 a 0,86), os realces não superam a original (10 de 20), porque o sinal está nas bordas
+  pupilar e límbica da faixa;
+- oito estatísticas globais de cor chegam a 0,769 de acurácia balanceada, sinal de possível atalho
+  de aquisição, e 13 descritores manuais de vascularização chegam a 0,777;
+- o Gabor é o realce mais estável sob perturbações fotométricas.
+
+Conclusão: a imagem filtrada é uma entrada viável, equivalente à original e menos sensível à
+orientação das faixas, mas esta base não permite atribuir o desempenho à vascularização, e
+descritores manuais também não ajudariam sobre ela.
+
+**2. A pupila precisa de features manuais ou basta a foto?** Precisa de features explícitas, mas
+extraídas automaticamente da foto. A normalização rubber sheet é invariante ao tamanho da pupila
+(proposição demonstrada no relatório; SSIM de pelo menos 0,83 entre faixas da mesma fotografia com
+a pupila simulada de 0,22 a 0,62, contra 0,52 entre íris diferentes). Numa coorte sintética 2 x 2,
+a faixa não detecta um efeito puramente geométrico (AUC 0,548), a geometria medida na foto chega a
+0,742 (limite teórico 0,760) e a fusão por empilhamento supera as duas fontes quando ambas têm sinal
+(0,866). O detector novo (`detect_eye_circles`: raios em estrela, RANSAC e refinamento
+integro-diferencial) mede a razão pupila/íris com erro absoluto médio de 0,0012, contra 0,015 do
+detector da demonstração anterior e 0,28 dos contornos ativos da IC. Como a espessura relativa do
+anel é 1 - razão pupila/íris, diâmetro e espessura relativos são a mesma informação; a espessura
+anatômica exigiria AS-OCT.
+
+Os resultados de classificação são exploratórios: a base legada não tem IDs de pessoa nem rótulos
+clínicos verificados, e o artigo associado a ela foi retratado.
+
+Para reproduzir (cerca de 2 h para a parte vascular e 3 min para a pupila):
+
+```bash
+export IRIS_LEGACY_DATA=/caminho/para/Data.zip   # PowerShell: $env:IRIS_LEGACY_DATA = "C:\...\Data.zip"
+python experiments/pgc3_vascular_pipeline.py     # figuras, tabelas e results/pgc3/
+python experiments/pgc3_pupil_geometry.py        # não usa a base legada
+python experiments/pgc3_numbers.py               # gera docs/PGC_3/tabelas/numeros.tex
+python -m unittest discover -s tests
+```
+
+Para compilar, rode `pdflatex resultados_preliminares_pgc3.tex` duas vezes dentro de
+`docs/PGC_3/`. As figuras derivadas da fotografia de Petr Novák seguem a licença CC BY-SA 2.5;
+nenhuma figura mostra imagens da base legada.
 
 ## 📁 Dataset
 
