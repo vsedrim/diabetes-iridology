@@ -1,0 +1,191 @@
+% ============================================================================
+% Apêndices (incluídos por resultados_preliminares_pgc3.tex)
+% ============================================================================
+\chapter{Reprodutibilidade}
+\label{ap:repro}
+
+Os comandos a seguir, executados a partir da raiz do repositório em
+PowerShell, reproduzem os resultados, executam os testes e compilam este
+documento. A base legada não acompanha o repositório: o caminho do arquivo
+\arq{Data.zip}, ou da pasta \arq{Data/Data}, é informado pela opção
+\texttt{--data} ou pela variável de ambiente \texttt{IRIS\_LEGACY\_DATA}.
+
+\begin{SingleSpace}
+\footnotesize
+\begin{verbatim}
+$env:IRIS_LEGACY_DATA = "C:\caminho\para\Data.zip"
+.\.venv\Scripts\python.exe experiments\pgc3_vascular_pipeline.py
+.\.venv\Scripts\python.exe experiments\pgc3_pupil_geometry.py
+.\.venv\Scripts\python.exe experiments\pgc3_numbers.py
+.\.venv\Scripts\python.exe -m unittest discover -s tests
+cd docs\PGC_3
+pdflatex resultados_preliminares_pgc3.tex
+pdflatex resultados_preliminares_pgc3.tex
+\end{verbatim}
+\end{SingleSpace}
+
+O primeiro \emph{script} levou \val{tempo-a} minutos e o segundo,
+\val{tempo-b} minutos, numa máquina com \val{env-cpus} processadores lógicos.
+As features de cada representação ficam guardadas em
+\arq{results/pgc3/cache}, de modo que execuções seguintes reaproveitam a
+extração. As partições da validação cruzada usam as sementes 2026 a 2035; o
+teste de permutação, as sementes 10000 a 10999; e a coorte sintética,
+sementes fixas por olho. O ambiente usou Python \val{env-python}, NumPy
+\val{env-numpy}, SciPy \val{env-scipy}, scikit-learn \val{env-sklearn}
+\citep*{Pedregosa2011}, scikit-image \val{env-skimage} \citep*{vanderWalt2014}
+e OpenCV \val{env-opencv} \citep*{Bradski2000}.
+
+Os testes automatizados (\arq{tests/test_pgc3.py}) verificam o bloqueio de
+objetos arbitrários na leitura dos arquivos legados, a remoção de cópias, o
+reparo da costura e a detecção de faixas espelhadas; o ajuste de Holm, o
+alargamento do intervalo pela correção de Nadeau e Bengio e os postos de
+Friedman; a exatidão da inversa da normalização (Equação~\ref{eq:inversa}) e
+a invariância da faixa à dilatação; a medição de $\rho$ em olhos sintéticos
+com erro menor que 0,01; a recuperação do sinal geométrico pela fusão; a
+compatibilidade do AdaBoost com as versões recentes do scikit-learn; e a
+leitura sem cópias pelo pipeline da IC.
+
+% ----------------------------------------------------------------------------
+\chapter{Tabelas completas da grade}
+\label{ap:tabelas}
+
+As Tabelas~\ref{tab:gradepixels} a \ref{tab:gradeic} trazem a acurácia
+balanceada e, entre parênteses, a AUC de cada configuração, em média de 50
+\emph{folds}; o negrito indica a melhor representação de cada classificador.
+A Tabela~\ref{tab:resumo} resume as representações, e a
+Tabela~\ref{tab:melhores} traz a melhor combinação de cada uma, com
+intervalos de confiança corrigidos. Escolher a melhor entre 15 combinações é
+uma seleção otimista; esses valores descrevem o teto observado nesta base e
+não devem ser lidos como estimativas de desempenho.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Grade com o conjunto de pixels}
+  \label{tab:gradepixels}
+  \footnotesize
+  \resizebox{\textwidth}{!}{\input{tabelas/tab_grade_pixels.tex}}
+  \par\medskip
+  \footnotesize Fonte: elaborada pelo autor.
+\end{table}
+
+\begin{table}[htbp]
+  \centering
+  \caption{Grade com o conjunto de textura}
+  \label{tab:gradetextura}
+  \footnotesize
+  \resizebox{\textwidth}{!}{\input{tabelas/tab_grade_textura.tex}}
+  \par\medskip
+  \footnotesize Fonte: elaborada pelo autor.
+\end{table}
+
+\begin{table}[htbp]
+  \centering
+  \caption{Grade com o conjunto padrão da IC}
+  \label{tab:gradeic}
+  \footnotesize
+  \resizebox{\textwidth}{!}{\input{tabelas/tab_grade_ic.tex}}
+  \par\medskip
+  \footnotesize Fonte: elaborada pelo autor.
+\end{table}
+
+\begin{table}[htbp]
+  \centering
+  \caption{Resumo por representação: médias da grade, postos de Friedman,
+  comparações com a original e teste de permutação}
+  \label{tab:resumo}
+  \footnotesize
+  \resizebox{\textwidth}{!}{\input{tabelas/tab_resumo_representacoes.tex}}
+  \par\medskip
+  \footnotesize Fonte: elaborada pelo autor. AB: acurácia balanceada;
+  $\uparrow$/$\downarrow$: combinações significativamente melhores ou piores
+  que a original após o ajuste de Holm sobre as 105 comparações; permutação:
+  RL sobre os pixels.
+\end{table}
+
+\begin{table}[htbp]
+  \centering
+  \caption{Melhor combinação de cada representação (seleção otimista)}
+  \label{tab:melhores}
+  \footnotesize
+  \resizebox{\textwidth}{!}{\input{tabelas/tab_melhores_combinacoes.tex}}
+  \par\medskip
+  \footnotesize Fonte: elaborada pelo autor.
+\end{table}
+
+\begin{table}[htbp]
+  \centering
+  \caption{Replicação no leiaute \texttt{personBase}: diferença de acurácia
+  balanceada em relação à original e valor $p$ ajustado por Holm}
+  \label{tab:efeitopb}
+  \footnotesize
+  \input{tabelas/tab_efeito_por_conjunto_personbase.tex}
+  \par\medskip
+  \footnotesize Fonte: elaborada pelo autor.
+\end{table}
+
+A Figura~\ref{fig:roc} mostra as curvas ROC médias de cada representação no
+leiaute principal, para o modelo pré-especificado (RL com o conjunto padrão da
+IC) e para a melhor combinação de cada representação, e a
+Figura~\ref{fig:cdauc} repete o ranking de Friedman com a AUC.
+
+\begin{figure}[htbp]
+  \centering
+  \caption{Curvas ROC médias por representação (\texttt{personBase\_invert})}
+  \label{fig:roc}
+  \includegraphics[width=\textwidth]{roc_representacoes.png}
+  \par\medskip
+  \footnotesize Fonte: elaborada pelo autor. Escores fora do \emph{fold}
+  agregados por repetição; o painel (b) resulta de uma seleção otimista.
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \caption{Postos médios de Friedman pela AUC e diferença crítica de Nemenyi}
+  \label{fig:cdauc}
+  \includegraphics[width=0.95\textwidth]{diferenca_critica_auc.png}
+  \par\medskip
+  \footnotesize Fonte: elaborada pelo autor.
+\end{figure}
+
+% ----------------------------------------------------------------------------
+\chapter{Parâmetros}
+\label{ap:parametros}
+
+\begin{quadro}[htb]
+  \caption{Parâmetros dos realces, dos descritores e dos experimentos}
+  \label{qua:parametros}
+  \footnotesize
+  \begin{tabular}{p{4.4cm}p{9.8cm}}
+    \toprule
+    Componente & Valores \\
+    \midrule
+    CLAHE & limite de contraste 2,0; grade de $8\times8$ \\
+    Frangi & $\sigma\in\{1,2,3,4\}$; $\beta=0{,}5$; $c=15$; cristas claras;
+      exibição por percentis 2 e 99 com gama 0,7 \\
+    Gabor & 8 orientações; núcleo $21\times21$; $\sigma=4$;
+      $\lambda=10$; $\gamma=0{,}5$; média do núcleo removida \\
+    Morfologia & \tht{} e \bh{} com elementos elípticos de 5, 11 e 21 pixels \\
+    Pixels & subamostragem por 4 com suavização ($50\times180$) \\
+    LBP & uniforme, 16 vizinhos, raio 2, histograma de 18 posições \\
+    GLCM & 64 níveis; distâncias 1, 2 e 3; ângulos 0°, 45°, 90° e 135°;
+      contraste, dissimilaridade, homogeneidade, energia, correlação e ASM \\
+    Estatísticas de intensidade & média, desvio-padrão, assimetria, curtose e
+      histograma de 32 posições \\
+    Classificadores & RL ($C=1$); SVM RBF ($C=1$, $\gamma$ automático); RF
+      (100 árvores); MLP (100 e 50 neurônios, Adam); AdaBoost (50
+      estimadores); semente 42 \\
+    Validação cruzada & estratificada por grupos, 5 \emph{folds}, 10
+      repetições (sementes 2026 a 2035) \\
+    Permutação & RL sobre pixels; 5 \emph{folds}; 1000 permutações \\
+    Detector de pupila & 72 raios; pico a 30\% do máximo do raio; RANSAC com
+      tolerância de 2 pixels; refinamento integro-diferencial com $\sigma=1{,}5$
+      e primeiro pico a 50\% \\
+    Detector de limbo & arcos laterais de $-45$° a 45° e de 135° a 225°;
+      RANSAC com tolerância de 3 pixels \\
+    Coorte sintética & imagens de $480\times480$; raio da íris entre 29\% e 35\%
+      do lado; excentricidade de até 0,04; ruído com desvio de 1,5 a 4,5 \\
+    \bottomrule
+  \end{tabular}
+  \par\medskip
+  \footnotesize Fonte: elaborado pelo autor.
+\end{quadro}

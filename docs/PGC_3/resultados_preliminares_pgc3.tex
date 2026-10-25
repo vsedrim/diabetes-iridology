@@ -1,0 +1,362 @@
+% ============================================================================
+% Relatório técnico com resultados preliminares para o Projeto de Graduação
+% em Computação III (UFABC)
+%
+% Apresentação conforme a ABNT: NBR 14724:2011 (trabalhos acadêmicos),
+% NBR 6023:2018 (referências), NBR 10520:2023 (citações), NBR 6024:2012
+% (numeração progressiva), NBR 6027:2012 (sumário) e NBR 6028:2021 (resumo).
+%
+% Compilação (duas passagens, para sumário, listas e referências cruzadas):
+%   pdflatex resultados_preliminares_pgc3.tex
+%   pdflatex resultados_preliminares_pgc3.tex
+%
+% Figuras (figuras/), tabelas (tabelas/) e TODOS os números citados no texto
+% (tabelas/numeros.tex, macro \val{chave}) são gerados pelos scripts
+%   experiments/pgc3_vascular_pipeline.py
+%   experiments/pgc3_pupil_geometry.py
+%   experiments/pgc3_numbers.py
+% a partir do código em src/. Para atualizar um número, reexecute os scripts;
+% não edite as tabelas nem o arquivo de números à mão.
+% ============================================================================
+\documentclass[12pt, oneside, a4paper, chapter=TITLE, section=TITLE,
+               english, brazil]{abntex2}
+
+% ---------------------------- Codificação e fontes --------------------------
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath, amssymb, amsthm, mathtools}
+\usepackage{newtxtext, newtxmath}
+\usepackage{microtype}
+
+% ---------------------------- Ilustrações e tabelas -------------------------
+\usepackage{graphicx}
+\graphicspath{{figuras/}}
+\usepackage{booktabs, multirow, makecell, array}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, calc, fit, backgrounds}
+
+% ---------------------------- Citações (NBR 10520:2023) ---------------------
+\usepackage[round, semicolon, sort]{natbib}
+\setcitestyle{aysep={,}, yysep={,}}
+
+% ---------------------------- Espaçamento e parágrafos ----------------------
+\setlength{\parindent}{1.25cm}
+\setlength{\parskip}{0.2cm}
+\counterwithout{equation}{chapter}
+
+% ---------------------------- Títulos (NBR 6024:2012) -----------------------
+\renewcommand{\ABNTEXchapterfont}{\rmfamily\bfseries}
+\renewcommand{\ABNTEXchapterfontsize}{\normalsize}
+\renewcommand{\ABNTEXsectionfont}{\rmfamily\mdseries}
+\renewcommand{\ABNTEXsectionfontsize}{\normalsize}
+\renewcommand{\ABNTEXsubsectionfont}{\rmfamily\bfseries}
+\renewcommand{\ABNTEXsubsectionfontsize}{\normalsize}
+\renewcommand{\ABNTEXsubsubsectionfont}{\rmfamily\mdseries}
+\renewcommand{\ABNTEXsubsubsectionfontsize}{\normalsize}
+\renewcommand{\cftsectionfont}{\normalfont}
+\renewcommand{\cftsectionpagefont}{\normalfont}
+\renewcommand{\cftsubsectionfont}{\bfseries}
+\renewcommand{\cftsubsectionpagefont}{\bfseries}
+\renewcommand{\cftsubsubsectionfont}{\normalfont}
+\renewcommand{\cftsubsubsectionpagefont}{\normalfont}
+\newcommand{\secao}[1]{\section[\texorpdfstring{\protect\MakeTextUppercase{#1}}{#1}]{#1}}
+
+\captionnamefont{\ABNTEXfontereduzida}
+\captiontitlefont{\ABNTEXfontereduzida}
+\addto\captionsbrazil{\renewcommand{\listfigurename}{Lista de figuras}}
+
+% ---------------------------- Paginação (NBR 14724:2011, 5.3) ---------------
+\makepagestyle{abntsimples}
+\makeoddhead{abntsimples}{}{}{\ABNTEXfontereduzida\thepage}
+\makeevenhead{abntsimples}{}{}{\ABNTEXfontereduzida\thepage}
+\setheadfoot{18pt}{\footskip}
+\setheaderspaces{*}{1.0cm}{*}
+\setulmarginsandblock{3cm}{2cm}{*}
+\checkandfixthelayout[fixed]
+
+% ---------------------------- Quadros ---------------------------------------
+\newcommand{\quadroname}{Quadro}
+\newcommand{\listofquadrosname}{Lista de quadros}
+\newfloat[chapter]{quadro}{loq}{\quadroname}
+\newlistof{listofquadros}{loq}{\listofquadrosname}
+\newlistentry{quadro}{loq}{0}
+\setfloatadjustment{quadro}{\centering}
+\counterwithout{quadro}{chapter}
+\renewcommand{\cftquadroname}{\quadroname\space}
+\renewcommand*{\cftquadroaftersnum}{\hfill\textendash\hfill}
+
+% ---------------------------- Enunciados ------------------------------------
+\theoremstyle{plain}
+\newtheorem{proposicao}{Proposição}
+\newtheorem{corolario}{Corolário}
+\theoremstyle{definition}
+\newtheorem{hipotese}{Hipótese}
+
+% ---------------------------- Referências (NBR 6023:2018) -------------------
+\setlength{\bibhang}{0pt}
+\renewcommand{\bibfont}{\SingleSpacing\raggedright\interlinepenalty=10000\relax}
+\setlength{\bibsep}{\baselineskip}
+\AtBeginDocument{%
+  \renewcommand{\bibsection}{%
+    \chapter*{\bibname}%
+    \phantomsection
+    \addcontentsline{toc}{chapter}{REFERÊNCIAS}}}
+\newcommand{\doi}[1]{DOI: \href{https://doi.org/#1}{#1}}
+\newcommand{\semlocal}{\textit{[S. l.]}}
+
+\hypersetup{colorlinks=true, linkcolor=black, citecolor=black, urlcolor=black,
+            filecolor=black, bookmarksdepth=4,
+            pdftitle={Imagens realçadas no pipeline de classificação e geometria pupilar: resultados preliminares para o PGC III},
+            pdfauthor={Vinicius Sedrim},
+            pdfsubject={Projeto de Graduação em Computação III, UFABC},
+            pdfkeywords={íris; vascularização; filtro de Frangi; pupila; rubber sheet; aprendizado de máquina}}
+\urlstyle{same}
+
+% ---------------------------- Atalhos ---------------------------------------
+\newcommand{\bh}{\emph{black-hat}}
+\newcommand{\tht}{\emph{top-hat}}
+\newcommand{\ves}{\emph{vesselness}}
+\newcommand{\rs}{\emph{rubber sheet}}
+\newcommand{\arq}[1]{\nolinkurl{#1}}
+
+% Números gerados pelos experimentos: \val{chave} (vírgula decimal) e
+% \valen{chave} (ponto decimal, para o abstract). Uma chave ausente aparece em
+% negrito com "??", o que facilita a conferência.
+\makeatletter
+\newcommand{\val}[1]{\@ifundefined{pgcval@#1}{\textbf{??#1}}{\@nameuse{pgcval@#1}}}
+\newcommand{\valen}[1]{\@ifundefined{pgcvalen@#1}{\textbf{??#1}}{\@nameuse{pgcvalen@#1}}}
+\makeatother
+\input{tabelas/numeros.tex}
+
+% ---------------------------- Dados do trabalho -----------------------------
+\titulo{Imagens realçadas como entrada do pipeline de classificação e o papel
+  da geometria pupilar}
+\autor{Vinicius Sedrim}
+\local{Santo André}
+\data{2026}
+\orientador{Vladimir Emiliano Moreira Rocha}
+
+% ============================================================================
+\begin{document}
+
+\selectlanguage{brazil}
+\frenchspacing
+
+% ------------------------------- Capa ---------------------------------------
+\begin{capa}
+  \centering
+  {\bfseries UNIVERSIDADE FEDERAL DO ABC\par}
+  {BACHARELADO EM CIÊNCIA DA COMPUTAÇÃO\par}
+  \vspace*{2.5cm}
+  {\bfseries VINICIUS SEDRIM\par}
+  \vfill
+  {\bfseries IMAGENS REALÇADAS COMO ENTRADA DO PIPELINE DE CLASSIFICAÇÃO E O
+  PAPEL DA GEOMETRIA PUPILAR:\par}
+  \vspace{4pt}
+  {resultados preliminares para o PGC III\par}
+  \vfill
+  Santo André\par
+  2026\par
+\end{capa}
+
+% ------------------------------- Folha de rosto -----------------------------
+\begin{folhaderosto}
+  \centering
+  {\bfseries VINICIUS SEDRIM\par}
+  \vfill
+  {\bfseries IMAGENS REALÇADAS COMO ENTRADA DO PIPELINE DE CLASSIFICAÇÃO E O
+  PAPEL DA GEOMETRIA PUPILAR:\par}
+  \vspace{4pt}
+  {resultados preliminares para o PGC III\par}
+  \vfill
+  \hspace{.45\textwidth}%
+  \begin{minipage}{.55\textwidth}
+    \SingleSpacing
+    Relatório técnico com resultados preliminares para o Projeto de
+    Graduação em Computação III do curso de Bacharelado em Ciência da
+    Computação da Universidade Federal do ABC, referente ao uso das imagens
+    realçadas diretamente no pipeline de classificação e à necessidade de
+    descritores explícitos para a geometria da pupila.
+
+    \vspace{0.6cm}
+    Orientador: Vladimir Emiliano Moreira Rocha
+  \end{minipage}
+  \vfill
+  Santo André\par
+  2026\par
+\end{folhaderosto}
+
+% ------------------------------- Resumo -------------------------------------
+\begin{resumo}
+Este relatório responde a duas perguntas sobre um pipeline de classificação
+de fotografias da íris usado no estudo de correlatos oculares do diabetes
+mellitus tipo 2 (DM2): se as imagens de três realces consolidados de
+estruturas finas (\ves{} de Frangi, banco de Gabor e morfologia \bh) podem
+substituir diretamente a imagem de entrada, sem descritores manuais de
+vascularização, e se a geometria da pupila exige descritores explícitos ou se
+a fotografia basta. Oito representações de entrada, três conjuntos de
+descritores e cinco classificadores formaram 120 configurações, avaliadas por
+validação cruzada estratificada repetida (\val{prot-rep} $\times$
+\val{prot-folds} \emph{folds}) sobre as \val{aud-unicas} imagens únicas que
+restaram da auditoria da base legada (\val{aud-copias} cópias exatas
+removidas de \val{aud-linhas} linhas). As imagens filtradas entram no pipeline
+sem outra alteração e classificam acima do acaso (\val{perm-p-txt}). No
+leiaute principal, com o vetor de pixels, os realces superam a imagem
+original em \val{pix-vitorias} de 20 combinações (acurácia balanceada média de
+\val{media-pixels-original} para até \val{pixels-filtros-max}), mas três
+controles mostram que o ganho não indica vascularização: ele não se repete no
+segundo leiaute (\val{pb-pix-vitorias} de 20), diminui quando as faixas
+espelhadas do olho direito voltam à orientação original (a imagem original
+passa a \val{des-original}) e desaparece quando só o estroma é usado
+(\val{rec-vit-estroma} de 20), concentrando-se nas bordas pupilar e límbica.
+Oito estatísticas globais de cor chegam a \val{ctl-abmax-cor}. Para a pupila,
+demonstra-se que a normalização \rs{} do pipeline é invariante ao tamanho da
+pupila: entre $\rho=\val{b1-rho-min}$ e $\rho=\val{b1-rho-max}$, a faixa de uma
+fotografia real mantém SSIM de pelo menos \val{b1-foto-ssim-min}, contra
+\val{b1-outras-ssim} entre íris diferentes. Numa coorte sintética, a faixa
+não detecta um efeito geométrico (AUC \val{b2-geometria-faixa}), a geometria
+medida na fotografia alcança \val{b2-geometria-geometria} (limite teórico
+\val{b2-teo}) e a fusão supera as duas fontes quando ambas têm sinal
+(\val{b2-ambos-fusao}). Conclui-se que as imagens filtradas podem entrar
+diretamente no pipeline, com desempenho equivalente ao da original e menor
+sensibilidade à orientação das faixas, mas que esta base não permite atribuir
+o desempenho à vascularização, nem justificaria descritores manuais; e que a
+pupila exige descritores geométricos explícitos, extraídos automaticamente da
+fotografia por um detector com erro absoluto médio de \val{b3-starburst-mae}
+em $\rho$. Os resultados são exploratórios: a base não tem identificadores de
+pessoa nem rótulos clínicos verificados, e o artigo associado a ela foi
+retratado.
+
+\vspace{\onelineskip}
+\noindent\textbf{Palavras-chave}: diabetes mellitus tipo 2; íris; filtro de
+Frangi; normalização \rs; geometria pupilar; validação cruzada.
+\end{resumo}
+
+% ------------------------------- Abstract -----------------------------------
+\begin{resumo}[Abstract]
+\begin{otherlanguage*}{english}
+This report answers two questions about an iris-photograph classification
+pipeline used to study ocular correlates of type 2 diabetes mellitus (T2DM):
+whether the images of three established thin-structure enhancements (Frangi
+vesselness, a Gabor bank and black-hat morphology) can directly replace the
+input image, without handcrafted vascular descriptors, and whether pupil
+geometry requires explicit descriptors or the photograph suffices. Eight input
+representations, three descriptor sets and five classifiers formed 120
+configurations, evaluated with repeated stratified cross-validation
+(\valen{prot-rep} $\times$ \valen{prot-folds} folds) on the \valen{aud-unicas}
+unique images left after auditing the legacy dataset (\valen{aud-copias} exact
+copies removed from \valen{aud-linhas} rows). The filtered images enter the
+pipeline without further changes and classify above chance
+(\valen{perm-p-txt}). In the main layout, with the pixel vector, the
+enhancements beat the original image in \valen{pix-vitorias} of 20 combinations
+(mean balanced accuracy from \valen{media-pixels-original} up to
+\valen{pixels-filtros-max}), but three controls show that the gain does not
+indicate vascular information: it does not replicate in the second layout
+(\valen{pb-pix-vitorias} of 20), it shrinks when the mirrored right-eye strips
+are returned to their original orientation (the original image rises to
+\valen{des-original}) and it vanishes when only the stroma is used
+(\valen{rec-vit-estroma} of 20), being concentrated at the pupillary and limbal
+borders. Eight global colour statistics reach \valen{ctl-abmax-cor}. For the
+pupil, the pipeline's rubber-sheet normalization is shown to be invariant to
+pupil size: between $\rho=\valen{b1-rho-min}$ and $\rho=\valen{b1-rho-max}$, the
+strip of a real photograph keeps an SSIM of at least \valen{b1-foto-ssim-min},
+against \valen{b1-outras-ssim} between different irises. In a synthetic cohort,
+the strip does not detect a geometric effect (AUC \valen{b2-geometria-faixa}),
+the geometry measured on the photograph reaches \valen{b2-geometria-geometria}
+(theoretical limit \valen{b2-teo}) and the fusion beats both sources when both
+carry signal (\valen{b2-ambos-fusao}). Filtered images can therefore enter the
+pipeline directly, performing on par with the original and with lower
+sensitivity to strip orientation, but this dataset does not allow the
+performance to be attributed to vascular structure, nor would it justify
+handcrafted descriptors; the pupil requires explicit geometric descriptors,
+extracted automatically from the photograph by a detector with a mean
+absolute error of \valen{b3-starburst-mae} in $\rho$. The results are
+exploratory: the dataset has neither person identifiers nor verified clinical
+labels, and the article associated with it has been retracted.
+
+\vspace{\onelineskip}
+\noindent\textbf{Keywords}: type 2 diabetes mellitus; iris; Frangi filter;
+rubber-sheet normalization; pupil geometry; cross-validation.
+\end{otherlanguage*}
+\end{resumo}
+
+% ------------------------------- Listas -------------------------------------
+\pdfbookmark[0]{\listfigurename}{lof}
+\listoffigures*
+\cleardoublepage
+
+\pdfbookmark[0]{\listofquadrosname}{loq}
+\listofquadros*
+\cleardoublepage
+
+\pdfbookmark[0]{\listtablename}{lot}
+\listoftables*
+\cleardoublepage
+
+\begin{siglas}
+  \item[AB] Acurácia balanceada, média da sensibilidade e da especificidade
+  \item[AS-OCT] Tomografia de coerência óptica do segmento anterior (do inglês
+    \emph{anterior segment optical coherence tomography})
+  \item[AUC] Área sob a curva ROC (do inglês \emph{area under the curve})
+  \item[CLAHE] Equalização adaptativa de histograma com limitação de
+    contraste (do inglês \emph{contrast limited adaptive histogram
+    equalization})
+  \item[DM2] Diabetes mellitus tipo 2
+  \item[FDR] Taxa de falsas descobertas (do inglês \emph{false discovery rate})
+  \item[GLCM] Matriz de coocorrência de níveis de cinza (do inglês
+    \emph{gray-level co-occurrence matrix})
+  \item[IC] Iniciação Científica (no texto, ``pipeline da IC'') ou intervalo
+    de confiança (em tabelas, ``IC 95\%'')
+  \item[LBP] Padrões binários locais (do inglês \emph{local binary patterns})
+  \item[MLP] Perceptron multicamadas (do inglês \emph{multilayer perceptron})
+  \item[PGC] Projeto de Graduação em Computação
+  \item[RANSAC] Consenso de amostras aleatórias (do inglês \emph{random sample
+    consensus})
+  \item[RF] Floresta aleatória (do inglês \emph{random forest})
+  \item[RGB] Vermelho, verde e azul (do inglês \emph{red, green, blue})
+  \item[RL] Regressão logística
+  \item[ROC] Característica de operação do receptor (do inglês
+    \emph{receiver operating characteristic})
+  \item[SSIM] Índice de similaridade estrutural (do inglês \emph{structural
+    similarity index})
+  \item[SVM] Máquina de vetores de suporte (do inglês \emph{support vector
+    machine})
+\end{siglas}
+
+\begin{simbolos}
+  \item[$r_p$, $r_i$] Raios da pupila e da íris
+  \item[$\mathbf{c}_p$, $\mathbf{c}_i$] Centros da pupila e da íris
+  \item[$\rho$] Razão entre os raios da pupila e da íris, $r_p/r_i$
+  \item[$\tau$] Espessura relativa do anel da íris, $(r_i-r_p)/r_i=1-\rho$
+  \item[$\epsilon$] Excentricidade, $\lVert\mathbf{c}_p-\mathbf{c}_i\rVert/r_i$
+  \item[$(s,\theta)$] Coordenadas normalizadas da faixa: raio relativo e
+    ângulo
+  \item[$N(s,\theta)$] Faixa normalizada pelo modelo \rs
+  \item[$\kappa$] Expoente do modelo não linear de deformação do estroma
+  \item[$k$] Número total de \emph{folds} da validação cruzada repetida
+  \item[$n_1$, $n_2$] Tamanhos médios dos conjuntos de treino e de teste
+  \item[$d$] Tamanho de efeito de Cohen
+\end{simbolos}
+
+% ------------------------------- Sumário ------------------------------------
+\pdfbookmark[0]{\contentsname}{toc}
+\tableofcontents*
+\cleardoublepage
+
+% ============================================================================
+\textual
+\pagestyle{abntsimples}
+\aliaspagestyle{chapter}{abntsimples}
+
+\input{corpo_pgc3}
+
+% ============================================================================
+\postextual
+\input{referencias_pgc3}
+
+\begin{apendicesenv}
+\input{apendices_pgc3}
+\end{apendicesenv}
+
+\end{document}

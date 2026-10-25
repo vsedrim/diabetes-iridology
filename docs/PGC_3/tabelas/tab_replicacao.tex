@@ -1,0 +1,20 @@
+% Gerado por experiments/pgc3_vascular_pipeline.py (não editar à mão).
+\begin{tabular}{lcccc}
+\toprule
+\multirow{2}{*}{Representação} & \multicolumn{2}{c}{\texttt{personBase\_invert}} & \multicolumn{2}{c}{\texttt{personBase}} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+ & AB média & Posto & AB média & Posto \\
+\midrule
+Original (cinza) & 0,762 & 4,87 & 0,816 & 3,47 \\
+Equalização global & 0,782 & 3,20 & 0,815 & 3,60 \\
+CLAHE & 0,746 & 5,73 & 0,797 & 4,93 \\
+Verde + CLAHE & 0,732 & 6,87 & 0,794 & 5,47 \\
+\midrule
+Frangi & 0,771 & 3,60 & 0,802 & 4,13 \\
+Gabor & 0,766 & 4,00 & 0,812 & 3,53 \\
+\textit{Black-hat} & 0,775 & 3,60 & 0,791 & 5,80 \\
+Frangi + \textit{black-hat} & 0,767 & 4,13 & 0,796 & 5,07 \\
+\midrule
+Friedman, $\chi^2_F$ ($p$) & \multicolumn{2}{c}{27,4 ($<$0,001)} & \multicolumn{2}{c}{15,2 (0,034)} \\
+\bottomrule
+\end{tabular}

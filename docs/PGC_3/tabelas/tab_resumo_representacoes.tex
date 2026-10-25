@@ -1,0 +1,18 @@
+% Gerado por experiments/pgc3_vascular_pipeline.py (não editar à mão).
+\begin{tabular}{lccccccc}
+\toprule
+\multirow{2}{*}{Representação} & \multicolumn{2}{c}{Média da grade} & \multicolumn{2}{c}{Posto médio} & \multicolumn{2}{c}{vs.\ original (Holm)} & Permutação \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+ & AB & AUC & AB & AUC & $\uparrow$ / $\downarrow$ & $\Delta$AB médio & $p$ \\
+\midrule
+Original (cinza) & 0,762 & 0,832 & 4,87 & 4,67 & -- & -- & $<$0,001 \\
+Equalização global & 0,782 & 0,857 & 3,20 & 2,20 & 0 / 0 & $+$0,021 & $<$0,001 \\
+CLAHE & 0,746 & 0,826 & 5,73 & 4,73 & 0 / 0 & $-$0,016 & $<$0,001 \\
+Verde + CLAHE & 0,732 & 0,810 & 6,87 & 6,67 & 0 / 0 & $-$0,030 & $<$0,001 \\
+\midrule
+Frangi & 0,771 & 0,829 & 3,60 & 4,47 & 0 / 0 & $+$0,010 & $<$0,001 \\
+Gabor & 0,766 & 0,827 & 4,00 & 5,20 & 0 / 0 & $+$0,005 & $<$0,001 \\
+\textit{Black-hat} & 0,775 & 0,853 & 3,60 & 2,80 & 0 / 0 & $+$0,013 & $<$0,001 \\
+Frangi + \textit{black-hat} & 0,767 & 0,822 & 4,13 & 5,27 & 0 / 0 & $+$0,006 & $<$0,001 \\
+\bottomrule
+\end{tabular}

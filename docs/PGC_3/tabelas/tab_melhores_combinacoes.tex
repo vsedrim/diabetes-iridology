@@ -1,0 +1,16 @@
+% Gerado por experiments/pgc3_vascular_pipeline.py (não editar à mão).
+\begin{tabular}{llcccc}
+\toprule
+Representação & Combinação & AB [IC 95\%] & AUC [IC 95\%] & Sensib. & Especif. \\
+\midrule
+Original (cinza) & Textura + RF & 0,859 [0,773; 0,946] & 0,908 [0,834; 0,981] & 0,819 & 0,899 \\
+Equalização global & Textura + MLP & 0,871 [0,805; 0,936] & 0,924 [0,866; 0,982] & 0,837 & 0,905 \\
+CLAHE & Textura + MLP & 0,826 [0,750; 0,902] & 0,903 [0,845; 0,962] & 0,794 & 0,857 \\
+Verde + CLAHE & Textura + MLP & 0,806 [0,726; 0,887] & 0,882 [0,814; 0,949] & 0,778 & 0,834 \\
+\midrule
+Frangi & Textura + RL & 0,809 [0,733; 0,884] & 0,861 [0,784; 0,937] & 0,755 & 0,862 \\
+Gabor & Textura + RF & 0,810 [0,725; 0,895] & 0,858 [0,774; 0,943] & 0,770 & 0,849 \\
+\textit{Black-hat} & Textura + MLP & 0,810 [0,726; 0,894] & 0,884 [0,814; 0,955] & 0,794 & 0,826 \\
+Frangi + \textit{black-hat} & Padrão da IC + RF & 0,810 [0,744; 0,876] & 0,845 [0,768; 0,923] & 0,714 & 0,906 \\
+\bottomrule
+\end{tabular}
